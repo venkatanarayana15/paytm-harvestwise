@@ -1,10 +1,10 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-18 (UI rebuild + WhatsApp verified end-to-end)
+Last updated: 2026-09-18 (WhatsApp copilot brain built — 103/103 green, commit a495fce)
 
 ## Phase
 Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
-Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Eval log).
+Finale: in-person build day — **copilot BRAIN BUILT + battery 103/103**; transport (WA-AKG Docker) is the next integration step.
 
 ## Blockers (owner + status)
 1. Round-1 PDF upload confirmation — owner: team — CLOSED ✅ 2026-09-13
@@ -17,9 +17,11 @@ Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Ev
 4. **Rotate burned keys** — owner: team — OPEN (see SECURITY.md)
    Sarvam + Cognee + Twilio credentials were pasted into the root readme during build. Treat as burned.
 5. **Import + activate the 3 n8n JSONs on n8n cloud** — owner: team — OPEN
-   Set `$env` vars on the n8n side: `COGNEE_BASE_URL`, `COGNEE_API_KEY`, `TWILIO_ACCOUNT_SID`,
-   `TWILIO_WHATSAPP_TO`, `TWILIO_WHATSAPP_FROM`, `TWILIO_ORDER_CONTENT_SID`,
-   `TWILIO_BRIEFING_CONTENT_SID`, plus the `twilio-basic` httpHeaderAuth credential.
+6. **WA-AKG live transport deploy** — owner: team — **NEW OPEN**
+   Copilot brain is built and 103/103 green via `/copilot/simulate` (commit a495fce). To run it on
+   real WhatsApp: `docker compose up -d` WA-AKG → QR scan → webhook to `POST /wa/inbound` (body:
+   `{"event":"message.received","data":{...}}`). Fallback already proven: Twilio freeform mode
+   (`TWILIO_CONTENT_MODE=freeform`) + `/twilio/inbound` + sandbox re-join.
 
 ## Locked decisions (do not relitigate without new evidence)
 - Track 1 Merchant Growth AI; HarvestWise perishable-restocking wedge; Lakshmi = labeled representative persona
@@ -33,11 +35,31 @@ Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Ev
   (~0.3–2 s); deep reasoning is a separate, labelled, on-demand call.
 
 ## Next single action
-Build day is INTEGRATE, not build. Run `python qa_battery.py` first (expect **86/86**); if anything
-fails, `GET /llm/diag` shows the last model call's latency and `finish_reason` — that is the fastest
-diagnosis path for a silent LLM. Then do blockers 5 → 2 → 3 above.
+Copilot brain is DONE and 103/103 green. The single highest-leverage move now: **deploy WA-AKG
+(`docker compose up -d`), QR-scan, and wire its webhook to `/wa/inbound`** — that turns this
+into a real, judge-visible WhatsApp conversation. If Docker/QR hits friction (>45 min), stop and
+ship the demo on Twilio freeform + `/copilot/simulate` (already proven). After transport is live:
+re-run `python qa_battery.py` (now **103/103**) → import 3 n8n JSONs (blocker 5) → rotate keys
+(blocker 4). If a check fails, `GET /llm/diag` shows the last model call's latency and
+`finish_reason` — that is the fastest diagnosis path for a silent LLM.
 
 ## Eval log
+- **2026-09-18 (late night, copilot brain): 103/103 battery green — commit `a495fce` pushed.**
+  - Full WhatsApp copilot built & verified end-to-end via `/copilot/simulate` (force_mock — no real sends):
+    1. Merchant order (Tamil text): `நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி` → parsed, basket
+       **₹546** (tomato 20kg + coriander 6 bunches @78% rain), vernacular ask with `சரி` confirm suffix.
+    2. `சரி` → per-item token → idempotent dispatch → confirmation bubble proving the loop:
+       `20 kg தக்காளி -> Rs.360 · 6 bunch கொத்தமல்லி -> Rs.186 · Total Rs.546 ·
+       Stock: tomato 12->32, coriander 5->11 (ledger + memory updated)`.
+    3. Security verified: unknown caller refused, injection (`ignore previous instructions`) blocked,
+       repeat approval → `no_pending`, deny cancels + clears basket, reset restores for rehearsal.
+  - New endpoints: `POST /wa/inbound` (WA-AKG JSON webhook) · `POST /twilio/inbound` (form-encoded
+    webhook, voice notes → Sarvam saaras:v3 OGG-native STT) · `POST /copilot/simulate` (offline path) ·
+    `GET /copilot/state` (pending orders + allowlist + transports). `/health` reports copilot status.
+  - Outbound transport-agnostic `_copilot_send`: **WA-AKG > Twilio freeform > mock log**, labelled.
+  - `TWILIO_CONTENT_MODE=freeform` added — kills the "Appt" template blocker in sandbox (plain Body).
+  - Phone allowlist via `COPILOT_ALLOWED_PHONES`; default = `TWILIO_WHATSAPP_TO`. `.env.example` updated.
+  - Battery grew 86 → **103** checks (section 13, 17 new).
 - **2026-09-18 (night, stage fail-safe): backup demo RECORDED + NARRATED** — `finale/backup_demo/`:
   real Full Auto run captured in headed Chromium → `demo_backup_narrated.mp4` (H.264 + AAC,
   1360×850, 34 s) with a Sarvam `bulbul:v3` narration track timed to the pipeline beats, plus a
