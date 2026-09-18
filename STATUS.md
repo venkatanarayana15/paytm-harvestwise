@@ -1,10 +1,10 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-18 (WhatsApp copilot brain built — 103/103 green, commit a495fce)
+Last updated: 2026-09-18 (WA-AKG LIVE deployed + copilot 103/103 — full WhatsApp copilot ready for QR scan)
 
 ## Phase
 Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
-Finale: in-person build day — **copilot BRAIN BUILT + battery 103/103**; transport (WA-AKG Docker) is the next integration step.
+Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — WA-AKG deployed (http://localhost:3000, session f2sxa9 SCAN_QR), webhook wired to host.docker.internal:8000/wa/inbound, 103/103 green. QR scan is the ONLY remaining human step.**
 
 ## Blockers (owner + status)
 1. Round-1 PDF upload confirmation — owner: team — CLOSED ✅ 2026-09-13
@@ -17,11 +17,13 @@ Finale: in-person build day — **copilot BRAIN BUILT + battery 103/103**; trans
 4. **Rotate burned keys** — owner: team — OPEN (see SECURITY.md)
    Sarvam + Cognee + Twilio credentials were pasted into the root readme during build. Treat as burned.
 5. **Import + activate the 3 n8n JSONs on n8n cloud** — owner: team — OPEN
-6. **WA-AKG live transport deploy** — owner: team — **NEW OPEN**
-   Copilot brain is built and 103/103 green via `/copilot/simulate` (commit a495fce). To run it on
-   real WhatsApp: `docker compose up -d` WA-AKG → QR scan → webhook to `POST /wa/inbound` (body:
-   `{"event":"message.received","data":{...}}`). Fallback already proven: Twilio freeform mode
-   (`TWILIO_CONTENT_MODE=freeform`) + `/twilio/inbound` + sandbox re-join.
+6. **WA-AKG live transport** — owner: team — **DEPLOYED ✅ 2026-09-18 21:00**
+   `wa-akg-app` (wa-akg-app:latest) + `wa-akg-db` (mysql:8.0) both Up (ports 3000 / 3307->3306).
+   Dashboard: http://localhost:3000  Admin: admin@harvestwise.in / HarvestWise@2026
+   Session: `harvestwise` (sessionId `f2sxa9`, id `cmu744ruq...`) status `SCAN_QR` — QR at `D:\Hackathons\WA-AKG\qr-harvestwise.png` + `finale/qr-harvestwise.png` (also at `GET /api/sessions/f2sxa9`).
+   API key: `wag_lJVg8D2O...` stored in `finale/.env` (WA_AKG_URL/SESSION/API_KEY).
+   Webhook: `harvestwise-copilot` → `http://host.docker.internal:8000/wa/inbound` events `["message.received"]` (verified: Docker → host `GET /health` 200). HarvestWise `/health` reports `copilot.wa_akg: true`.
+   **Action needed: scan the QR with WhatsApp Linked Devices NOW** — after that, merchant `917010919624` can use full loop (text/voice → ask → `சரி` → dispatch confirm 12→32). Until scanned, `/copilot/simulate` + `/wa/inbound` API (103/103) carry the demo.
 
 ## Locked decisions (do not relitigate without new evidence)
 - Track 1 Merchant Growth AI; HarvestWise perishable-restocking wedge; Lakshmi = labeled representative persona
@@ -35,15 +37,11 @@ Finale: in-person build day — **copilot BRAIN BUILT + battery 103/103**; trans
   (~0.3–2 s); deep reasoning is a separate, labelled, on-demand call.
 
 ## Next single action
-Copilot brain is DONE and 103/103 green. The single highest-leverage move now: **deploy WA-AKG
-(`docker compose up -d`), QR-scan, and wire its webhook to `/wa/inbound`** — that turns this
-into a real, judge-visible WhatsApp conversation. If Docker/QR hits friction (>45 min), stop and
-ship the demo on Twilio freeform + `/copilot/simulate` (already proven). After transport is live:
-re-run `python qa_battery.py` (now **103/103**) → import 3 n8n JSONs (blocker 5) → rotate keys
-(blocker 4). If a check fails, `GET /llm/diag` shows the last model call's latency and
-`finish_reason` — that is the fastest diagnosis path for a silent LLM.
+**WA-AKG is LIVE — scan the QR NOW:** Open `http://localhost:3000` (or the PNG at `finale/qr-harvestwise.png`), WhatsApp → Linked Devices → Link a Device → scan. After `status: CONNECTED`, send a test: `நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி` → expect vernacular ask (546), then `சரி` → `HarvestWise ✅ Order dispatched · Total Rs.546 · Stock tomato 12→32`. If no spare phone, the API path is already 103/103 proven: `POST /wa/inbound` (WA-AKG payload) works. Then do blocker 5 (import 3 n8n JSONs) → blocker 4 (rotate keys).
 
 ## Eval log
+- **2026-09-18 (21:00, WA-AKG LIVE): 103/103 battery green, Docker transports proven.**
+  - WA-AKG stack up after fixing Dockerfile `if [ -n "$ADMIN_EMAIL"]` missing-space bug (was `sh: missing ]`, admin never created) → `docker exec setup-admin` → login 200 → session `f2sxa9` `SCAN_QR` → API key `wag_lJVg...` → webhook `harvestwise-copilot` → `host.docker.internal:8000/wa/inbound` (`message.received`) → Docker→host `GET /health` 200 → HarvestWise `/health` now `copilot.wa_akg: true, twilio_freeform: true` → battery still 103/103 → live `POST /wa/inbound` payload proves `awaiting_approval 546` → `dispatched 2 · 546 · 12→32` before any phone is linked. QR saved (`WA-AKG/qr-harvestwise.png` + `finale/qr-harvestwise.png`, also `GET /api/sessions/f2sxa9`). MySQL remapped 3307->3306 (host conflict), DB healthy. Full loop is now: WhatsApp text/voice → Sarvam saaras:v3 OGG-native → `_handle_merchant_message` (allowlist + injection guard) → deterministic `recommendation()` → `template_ask` → `pending_orders[phone]` → `சரி` → per-item token+dispatch → stock ledger 12→32 + mock/copilot logs.
 - **2026-09-18 (late night, copilot brain): 103/103 battery green — commit `a495fce` pushed.**
   - Full WhatsApp copilot built & verified end-to-end via `/copilot/simulate` (force_mock — no real sends):
     1. Merchant order (Tamil text): `நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி` → parsed, basket
