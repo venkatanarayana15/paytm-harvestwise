@@ -1,10 +1,10 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-18 (WA-AKG LIVE deployed + copilot 103/103 — full WhatsApp copilot ready for QR scan)
+Last updated: 2026-09-18 23:35 — CONNECTED ✅ Full WhatsApp copilot LIVE (f2sxa9, 103/103, end-to-end proven)
 
 ## Phase
 Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
-Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — WA-AKG deployed (http://localhost:3000, session f2sxa9 SCAN_QR), webhook wired to host.docker.internal:8000/wa/inbound, 103/103 green. QR scan is the ONLY remaining human step.**
+Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — CONNECTED ✅** WA-AKG `f2sxa9` CONNECTED (was SCAN_QR), webhook `host.docker.internal:8000/wa/inbound`, HarvestWise `wa_akg:true`, battery **103/103**, `/wa/inbound` live `awaiting_approval 546 → dispatched` proven. Send a real WhatsApp now.
 
 ## Blockers (owner + status)
 1. Round-1 PDF upload confirmation — owner: team — CLOSED ✅ 2026-09-13
@@ -17,7 +17,7 @@ Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — WA-AKG deployed
 4. **Rotate burned keys** — owner: team — OPEN (see SECURITY.md)
    Sarvam + Cognee + Twilio credentials were pasted into the root readme during build. Treat as burned.
 5. **Import + activate the 3 n8n JSONs on n8n cloud** — owner: team — OPEN
-6. **WA-AKG live transport** — owner: team — **DEPLOYED ✅ 2026-09-18 21:00**
+6. **WA-AKG live transport** — owner: team — **CONNECTED ✅ 2026-09-18 23:35**
    `wa-akg-app` (wa-akg-app:latest) + `wa-akg-db` (mysql:8.0) both Up (ports 3000 / 3307->3306).
    Dashboard: http://localhost:3000  Admin: admin@harvestwise.in / HarvestWise@2026
    Session: `harvestwise` (sessionId `f2sxa9`, id `cmu744ruq...`) status `SCAN_QR` — QR at `D:\Hackathons\WA-AKG\qr-harvestwise.png` + `finale/qr-harvestwise.png` (also at `GET /api/sessions/f2sxa9`).
