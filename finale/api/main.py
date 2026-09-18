@@ -509,7 +509,30 @@ def _fire_n8n(record: dict) -> None:
         record["n8n_error"] = str(e)
 
 
+def _twilio_content_vars(record: dict, order: dict, n_vars: int) -> dict:
+    """ContentVariables sized to the registered Twilio template.
+
+    2 = qty + product (legacy/Appt template)
+    4 = + supplier + total (n8n dispatch.json default)
+    6 = + stock_before + stock_after — the copilot proof: the WhatsApp
+        bubble itself shows the ledger move ("Stock 12 → 32").
+    """
+    content_vars = {"1": str(order["qty"]), "2": order["product"]}
+    if n_vars >= 4:
+        content_vars.update({"3": order["supplier"], "4": str(record.get("total_inr") or "")})
+    if n_vars >= 6:
+        content_vars.update({"5": str(record.get("stock_before") or ""),
+                             "6": str(record.get("stock_after") or "")})
+    return content_vars
+
+
 def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
+    """Send the order over WhatsApp via Twilio.
+
+    Never fakes success: every outcome is labelled on the record —
+    `sent` (201), a real error code, or `skipped` with a plain-language note.
+    The message SID is kept on the record so delivery can be verified later.
+    """
     twilio_sid, twilio_token = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
     if not twilio_sid or not twilio_token:
         return
@@ -522,7 +545,9 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
             "TWILIO_WHATSAPP_TO not set — mock WhatsApp logged (no placeholder send). "
             "Set it + verify in Twilio console for a real buzz on stage."
         )
-        mock_msg = f"HarvestWise order: {order['qty']} {order['product']} ({record['total_inr']} INR) -> {order['supplier']}"
+        mock_msg = (f"HarvestWise order: {order['qty']} {order['product']} "
+                    f"({record['total_inr']} INR) -> {order['supplier']} "
+                    f"| stock {record.get('stock_before')}->{record.get('stock_after')} (ledger updated)")
         try:
             os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
             with open(os.path.join(BASE_DIR, "data", "mock_whatsapp.log"), "a", encoding="utf-8") as lf:
@@ -532,25 +557,83 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
             pass
         return
     try:
+        n_vars = max(int(os.getenv("TWILIO_TEMPLATE_VARS", "2") or 2), 2)
+        record["twilio_vars"] = n_vars
         auth = base64.b64encode(f"{twilio_sid}:{twilio_token}".encode()).decode()
         data = {
             "To": recipient,
             "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
             "ContentSid": os.getenv("TWILIO_CONTENT_SID", ""),
-            "ContentVariables": json.dumps({
-                "1": str(order["qty"]), "2": order["product"],
-                **({"3": order["supplier"], "4": str(record["total_inr"] or "")}
-                  if os.getenv("TWILIO_TEMPLATE_VARS") == "4" else {}),
-            }),
+            "ContentVariables": json.dumps(_twilio_content_vars(record, order, n_vars)),
         }
         r = httpx.post(f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
                        data=data, headers={"Authorization": f"Basic {auth}"}, timeout=10)
         record["twilio_status"] = r.status_code
-        if r.status_code >= 400:
+        if r.status_code < 300:
+            body = r.json() if "application/json" in r.headers.get("content-type", "") else {}
+            record["twilio_sid"] = (body.get("sid") or "")[:34]
+            record["twilio_to"] = recipient
+        elif r.status_code >= 400:
             record["twilio_body"] = r.text[:300]
             record["twilio_note"] = "template send rejected — see Twilio console (dispatch still recorded)"
     except Exception as e:
         record["twilio_error"] = str(e)
+
+
+@app.get("/whatsapp/status")
+def whatsapp_status():
+    """One-glance WhatsApp health for the dashboard + judges.
+
+    Reports config (is a verified recipient set?), the recipient number, and the
+    delivery state of the most recent outbound message straight from Twilio's
+    API (accepted/queued/sent/delivered/read or failed + error code). Falls back
+    to the local dispatch record when Twilio is unreachable — never blocks.
+    """
+    sid, tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
+    recipient = os.getenv("TWILIO_WHATSAPP_TO")
+    out = {
+        "account_configured": bool(sid and tok),
+        "recipient_set": bool(recipient),
+        "recipient": recipient or None,
+        "mode": "live" if (sid and tok and recipient) else "mock",
+    }
+    # Most recent local record, for context even when Twilio is unreachable.
+    try:
+        with open(DISPATCH_RECORD_PATH, encoding="utf-8") as f:
+            rec = json.load(f)
+        out["last_dispatch"] = {
+            "product": rec.get("product"), "qty": rec.get("quantity_kg"),
+            "unit": rec.get("unit"), "total_inr": rec.get("total_inr"),
+            "twilio_status": rec.get("twilio_status"), "at": rec.get("at"),
+            "message_sid": rec.get("twilio_sid"),
+        }
+        sid_local = rec.get("twilio_sid")
+    except Exception:
+        sid_local = None
+    if not (sid and tok):
+        out["last_message"] = {"status": "no_account"}
+        return out
+    auth = base64.b64encode(f"{sid}:{tok}".encode()).decode()
+    try:
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
+        if sid_local:
+            url += f"/{sid_local}"
+        else:
+            url += "?PageSize=1"
+        r = httpx.get(url, headers={"Authorization": f"Basic {auth}"}, timeout=6)
+        if r.status_code == 200:
+            m = r.json()
+            msg = m if "sid" in m else (m.get("messages") or [{}])[0]
+            out["last_message"] = {
+                "status": msg.get("status"), "error_code": msg.get("error_code"),
+                "to": msg.get("to"), "date": str(msg.get("date_created") or ""),
+                "source": "twilio-api",
+            }
+        else:
+            out["last_message"] = {"status": f"probe-http-{r.status_code}", "source": "twilio-api"}
+    except Exception as e:
+        out["last_message"] = {"status": "probe-failed", "error": type(e).__name__, "source": "twilio-api"}
+    return out
 
 
 @app.post("/dispatch")

@@ -101,7 +101,8 @@
       "typeVersion": 4.2,
       "position": [660, -80],
       "onError": "continueRegularOutput",
-      "notes": "Credential: httpHeaderAuth named 'twilio-basic' with header Authorization: Basic <base64(ACCOUNT_SID:AUTH_TOKEN)>. Env vars: TWILIO_ACCOUNT_SID, TWILIO_WHATSAPP_TO (verified recipient — trial error 572002 without this), TWILIO_WHATSAPP_FROM, TWILIO_ORDER_CONTENT_SID. Previously this used $credentials.sid (nonexistent) and a hardcoded 'whatsapp:+91XXXXXXXXXX' placeholder."
+      "disabled": true,
+      "notes": "DISABLED BY DESIGN — prevents DOUBLE-SEND. The FastAPI dispatch endpoint already sends the WhatsApp directly (_fire_twilio, verified end-to-end 201→delivered). This node is the n8n-side sender used only if the API-level Twilio send is switched off. If you enable it: set env TWILIO_ORDER_CONTENT_SID and the 6-var template (TWILIO_TEMPLATE_VARS=6 on the API side keeps the record honest). Credential: httpHeaderAuth named 'twilio-basic' with header Authorization: Basic <base64(ACCOUNT_SID:AUTH_TOKEN)>. Trial accounts must add the merchant number as a verified recipient (Twilio error 572002 otherwise)."
     },
     {
       "parameters": {
