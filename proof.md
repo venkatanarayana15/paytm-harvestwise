@@ -5,7 +5,7 @@
 > ⚠️ **Addendum (2026-09-18, post-shortlist).** This file is the historical evidence pack for the
 > **submitted Round 1 deck** and its contents remain an accurate record of that submission. One row is
 > now out of date: §6 said "`finale/` today holds planning docs only and zero code files" — that was
-> true at submission time and is no longer. The finale slice is now built and verified (83/83 battery,
+> true at submission time and is no longer. The finale slice is now built and verified (86/86 battery,
 > dashboard renders end-to-end); see `finale/IMPROVEMENTS.md` for the audit and `STATUS.md` for state.
 > Do not re-export or alter the submitted PDF.
 > **Artifact:** `deck/HarvestWise_Round1_PaytmHackathon.pdf` (1.41 MB · 10 pages · 1280×720 CSS / 960×540 pt · valid PDF header · re-exported 2026-09-13 18:51 after humanize pass, CreationDate D:20260913132147+00'00')

@@ -34,12 +34,13 @@ Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Ev
   (~0.3–2 s); deep reasoning is a separate, labelled, on-demand call.
 
 ## Next single action
-Build day is INTEGRATE, not build. Run `python qa_battery.py` first (expect **83/83**); if anything
+Build day is INTEGRATE, not build. Run `python qa_battery.py` first (expect **86/86**); if anything
 fails, `GET /llm/diag` shows the last model call's latency and `finish_reason` — that is the fastest
 diagnosis path for a silent LLM. Then do blockers 5 → 2 → 3 above.
 
 ## Eval log
-- **2026-09-18 (hardening pass): 83/83 battery green.** Reproduced by running the code, not reading it.
+- **2026-09-18 (hardening pass): 86/86 battery green**, stable across 4 consecutive runs (0 failures,
+  0 warnings). Reproduced by running the code, not reading it.
   Six defects were demo-breaking or doctrine-breaking. Full details + evidence: `finale/IMPROVEMENTS.md`.
   - 🔴 "Live weather" had **never worked**: a pre-encoded timezone (`Asia%2FCalcutta`) was double-encoded
     by httpx → HTTP 400 on every call, hidden by `except: pass`. Also fetched *today* while narrating
@@ -61,8 +62,15 @@ diagnosis path for a silent LLM. Then do blockers 5 → 2 → 3 above.
     bogus `OPENWEATHER_KEY` to open-meteo; daywrap/briefing had no respond node.
   - 🟡 Docs contradicted each other (22 vs 28 vs the real 31 checks; a 20%-rain script vs the 78% story;
     Kannada-first DEMOSCRIPT vs Tamil-first build).
+  - 🟡 **Provider flakiness found and absorbed:** Sarvam intermittently returns an Azure Application
+    Gateway error page (`text/html`, 183 bytes) instead of JSON. Falls back correctly, but it made the
+    suite non-deterministic. Added a single retry inside `_call` (verified: 4 consecutive clean runs)
+    and a one-line `_clean_error` so `/llm/diag` shows something readable instead of an HTTP header dump.
   - Verified in the same pass: injection refusal, idempotency surviving restart, backup audio
     transcribing to `{tomato:20, coriander:10}`, seeded 78%/₹546, live path 94%, dashboard DOM render.
+  - The suite now separates hard invariants (quantities, safety refusals, labelled fallbacks) from
+    provider-dependent capability probes, which WARN instead of failing — degradation to rules is
+    designed behavior, not a defect.
 - 2026-09-18 (earlier): 31/31 checks — intent battery, engine invariants (20kg/6 bunches/₹546/rain 78%),
   approve→dispatch security (replay + bogus refused, deny gate held), graceful 400s, real STT round-trip.
 - 2026-09-13: mentor red-team battery 9.5/10 across 10 adversarial tests; no further prompt defects found.

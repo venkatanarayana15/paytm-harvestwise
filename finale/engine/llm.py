@@ -102,7 +102,7 @@ def _call(messages: list[dict], model: str, max_tokens: int,
     budget = timeout if timeout is not None else fast_timeout()
     started = time.time()
 
-    def _work():
+    def _attempt():
         kwargs = dict(model=model, messages=messages,
                       temperature=temperature, max_tokens=max_tokens)
         if model == DEEP_MODEL:
@@ -116,6 +116,17 @@ def _call(messages: list[dict], model: str, max_tokens: int,
                 choices[0].finish_reason,
                 len(getattr(msg, "reasoning_content", None) or ""))
 
+    def _work():
+        # The provider intermittently returns an Azure Application Gateway error
+        # page (text/html, content-length 183) instead of JSON. Verified live
+        # 2026-09-18. A single retry turns most of those into a normal answer
+        # instead of a degraded one, at the cost of ~0.5s.
+        try:
+            return _attempt()
+        except Exception:
+            time.sleep(0.5)
+            return _attempt()
+
     try:
         future = _EXECUTOR.submit(_work)
         content, finish, rchars = future.result(timeout=budget)
@@ -126,14 +137,28 @@ def _call(messages: list[dict], model: str, max_tokens: int,
         return content
     except concurrent.futures.TimeoutError:
         LAST.update({"model": model, "elapsed_s": round(time.time() - started, 2),
-                     "finish_reason": "client-timeout", "error": f"exceeded {budget}s",
+                     "finish_reason": "client-timeout", "error": f"exceeded {budget}s budget",
                      "ok": False, "at": time.strftime("%H:%M:%S")})
         return None
     except Exception as e:
         LAST.update({"model": model, "elapsed_s": round(time.time() - started, 2),
-                     "finish_reason": "exception", "error": f"{type(e).__name__}: {e}"[:300],
+                     "finish_reason": "exception", "error": _clean_error(e),
                      "ok": False, "at": time.strftime("%H:%M:%S")})
         return None
+
+
+def _clean_error(e: Exception) -> str:
+    """One readable line. The raw provider error was a multi-line HTTP header
+    dump (Azure gateway HTML page) — unreadable on stage and in /llm/diag."""
+    text = " ".join(str(e).split())
+    hint = ""
+    if "503" in text or "502" in text or "text/html" in text:
+        hint = " (upstream gateway error — transient, retried once)"
+    elif "429" in text:
+        hint = " (rate limited)"
+    elif "401" in text or "403" in text:
+        hint = " (check SARVAM_API_KEY)"
+    return f"{type(e).__name__}: {text[:150]}{hint}"
 
 
 def diag() -> dict:

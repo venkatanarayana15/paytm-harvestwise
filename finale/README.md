@@ -4,7 +4,7 @@ Goal: on build day this repo means **INTEGRATE + REHEARSE**, not architect.
 Scope = frozen vertical slice (knowledge/08): tomato + coriander restocking, one Tamil voice command,
 deterministic recommendation, voice approval, n8n dispatch, memory + inventory update.
 
-Verified 2026-09-18: **83/83 QA battery green** (`python qa_battery.py`) and the dashboard renders
+Verified 2026-09-18: **86/86 QA battery green** (`python qa_battery.py`) and the dashboard renders
 end-to-end in a real browser (headless Chrome DOM dump).
 
 ## Structure (as built)
@@ -30,7 +30,7 @@ finale/
   ui/index.html            single-file dashboard (real mic capture, typed fallback,
                            live stock/ledger panel, LLM reasoning + Cognee recall)
   ui/assets/command_ta.wav CACHED BACKUP command audio (TTS — see labeling note)
-  qa_battery.py            83 regression checks — run with the API up
+  qa_battery.py            86 regression checks — run with the API up
   make_backup_audio.py     regenerates the cached backup audio
   FAILPATHS.md             the failure states + expected behavior
 ```
@@ -81,7 +81,7 @@ Measured failure it prevents: the model said "நாளை 20 கிலோ த�
 coriander, which would have let the merchant approve an item she never heard.
 
 ## Build-day protocol (Luma agenda: build 10:00–17:00, demos 18:00–20:00)
-- **Hour 0–2:** clone · run seed · `python qa_battery.py` (expect 83/83) · dashboard shows state
+- **Hour 0–2:** clone · run seed · `python qa_battery.py` (expect 86/86) · dashboard shows state
 - **Hour 2–5:** import the 3 n8n JSONs, point webhooks at your tunnel · pre-run one dispatch so
   execution history has real records · hit `/reason` once to pre-warm
 - **Hour 5–7:** noise stress-test the command · RECORD BACKUP DEMO (OBS + phone) · rehearse 3:00

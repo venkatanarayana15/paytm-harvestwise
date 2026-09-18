@@ -30,6 +30,6 @@ All failure responses must look DESIGNED, not crashed.
 ## Pre-flight (5 minutes, before every rehearsal and before you go on stage)
 1. `curl -s http://127.0.0.1:8000/health` → `status: ok`, `weather_mode: seeded`, `llm_mode: hybrid`
 2. `POST /demo/reset` → stock back to tomato 12 / coriander 6
-3. `python qa_battery.py` → **83 passed, 0 failed**
+3. `python qa_battery.py` → **86 passed, 0 failed**
 4. Click **▶ Cached audio** once and **Reason (Sarvam-105B)** once, so both paths are warm
 5. `GET /llm/diag` → `available: true` (and `last_call.finish_reason: "stop"`, not `"length"`)
