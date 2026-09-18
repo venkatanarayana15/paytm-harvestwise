@@ -1,0 +1,21 @@
+{
+  "lakshmi": {
+    "sells": "tomato, coriander",
+    "recent_sales_velocity": "+18% vs last week (tomato 14kg/day avg)",
+    "current_stock": "12 kg tomato, 6 bunches coriander on hand",
+    "expected_rain": "78% tomorrow (IMD, Basavanagudi)",
+    "shelf_life": "tomato 2 days, coriander 1 day at 85% humidity",
+    "rain_sensitivity": "coriander rainy-day sales -40% (90d history); tomato holds",
+    "recommendation": "20 kg tomato (requested 3 crates) + 6 bunches coriander (10 asked, rain-adjusted) — basket ₹546",
+    "cause_chain": [
+      "Lakshmi -> sells -> Tomato, Coriander",
+      "Tomato -> velocity -> +18% (14kg/day)",
+      "Coriander -> rainy-day sales -> -40%",
+      "Stock -> 12kg tomato, 6 bunches coriander",
+      "Tomorrow -> rain -> 78%",
+      "Engine -> tomato 20kg x1.0, coriander 10x0.6=6 bunches",
+      "Basket -> 360 + 186 = Rs.546 -> approved & dispatched"
+    ],
+    "updated": "2026-09-18T09:23:23.694882"
+  }
+}

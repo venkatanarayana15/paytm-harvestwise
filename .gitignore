@@ -1,18 +1,32 @@
+# Ignore environment and local state files
 .env
-__pycache__
-*.pyc
-*.egg-info
-node_modules
-.vscode
-.idea
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Node
+node_modules/
+.npm/
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
-.DS_Store
-.DS_Store?
 *~
+
+# OS
 .DS_Store
 Thumbs.db
-.DS_Store
-*.bak
-*.orig
-*.rej
+
+# Local runtime files
+finale/memory.json
+finale/data/seed.json
+finale/dispatch_record.json
+finale/dispatched_tokens.txt
+finale/tts_*.wav
+playwright-mcp/
+qa-runs/n8n-lab/
