@@ -7,6 +7,7 @@ CATALOG = {
     "lakshmi": {
         "tomato": {
             "name_tn": "தக்காளி",
+            "name_kn": "ಟೊಮ್ಯಾಟೊ",
             "unit": "kg",
             "velocity": 14,
             "decay_days": 2,
@@ -17,6 +18,7 @@ CATALOG = {
         },
         "coriander": {
             "name_tn": "கொத்தமல்லி",
+            "name_kn": "ಕೊತ್ತಂಬರಿ",
             "unit": "bunch",
             "velocity": 8,
             "decay_days": 1,
@@ -27,6 +29,7 @@ CATALOG = {
         },
         "onion": {
             "name_tn": "வெங்காயம்",
+            "name_kn": "ಈರುಳ್ಳಿ",
             "unit": "kg",
             "velocity": 10,
             "decay_days": 5,
@@ -37,6 +40,7 @@ CATALOG = {
         },
         "spinach": {
             "name_tn": "முரைக்கீரை",
+            "name_kn": "ಪಾಲಕ್ ಸೊಪ್ಪು",
             "unit": "bunch",
             "velocity": 6,
             "decay_days": 1,

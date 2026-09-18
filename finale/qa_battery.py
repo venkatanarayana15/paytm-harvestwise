@@ -17,8 +17,11 @@ check("health", h.get("status") == "ok", str(h))
 print("== 2. intent battery ==")
 cases = [
     ("Tamil numeric", "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி", {"tomato": 20, "coriander": 10}),
+    ("Kannada numeric", "ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ", {"tomato": 20, "coriander": 10}),
+    ("Kannada wordnum", "ನಾಳೆ ಇಪ್ಪತ್ತು ಕಿಲೋ ಟೊಮ್ಯಾಟೊ", {"tomato": 20}),
     ("English crates", "send 3 crates tomato and 10 bunches coriander", {"tomato": 60, "coriander": 10}),
     ("decline", "இல்ல வேண்டாம்", None),
+    ("Kannada decline", "ಬೇಡ", None),
     ("ambiguous", "தக்காளி அனுப்பு", {"tomato": None}),
 ]
 for name, t, expect in cases:

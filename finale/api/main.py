@@ -21,32 +21,38 @@ dispatched_tokens: set[str] = set()
 TAMIL_WORDNUM = {"ஒன்று": 1, "இரண்டு": 2, "மூன்று": 3, "நான்கு": 4, "ஐந்து": 5,
                  "ஆறு": 6, "ஏழு": 7, "எட்டு": 8, "ஒன்பது": 9, "பத்து": 10,
                  "இருபது": 20, "முப்பது": 30}
+KANNADA_WORDNUM = {"ಒಂದು": 1, "ಎರಡು": 2, "ಮೂರು": 3, "ನಾಲ್ಕು": 4, "ಐದು": 5,
+                   "ಆರು": 6, "ಏಳು": 7, "ಎಂಟು": 8, "ಒಂಬತ್ತು": 9, "ಹತ್ತು": 10,
+                   "ಇಪ್ಪತ್ತು": 20, "ಮೂವತ್ತು": 30}
+WORDNUM = {**TAMIL_WORDNUM, **KANNADA_WORDNUM}
 # unit word -> (canonical unit, multiplier into that unit)
 UNIT_WORDS = {
-    "கிலோ": ("kg", 1), "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
-    "கிரேட்": ("kg", 20), "crate": ("kg", 20), "crates": ("kg", 20),
-    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
+    "கிலோ": ("kg", 1), "ಕಿಲೋ": ("kg", 1), "ಕೆಜಿ": ("kg", 1), "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
+    "கிரேட்": ("kg", 20), "ಕ್ರೇಟ್": ("kg", 20), "crate": ("kg", 20), "crates": ("kg", 20),
+    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "ಗೊಂಚಲು": ("bunch", 1), "ಕಟ್ಟು": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
 }
 PRODUCT_WORDS = {
-    "tomato": "tomato", "tomatoes": "tomato", "தக்காளி": "tomato", "tamatar": "tomato",
-    "coriander": "coriander", "kothamalli": "coriander", "கொத்தமல்லி": "coriander",
-    "dhania": "coriander", "onion": "onion", "வெங்காயம்": "onion",
+    "tomato": "tomato", "tomatoes": "tomato", "தக்காளி": "tomato", "tamatar": "tomato", "ಟೊಮ್ಯಾಟೊ": "tomato", "ಟೊಮೇಟೊ": "tomato",
+    "coriander": "coriander", "kothamalli": "coriander", "கொத்தமல்லி": "coriander", "ಕೊತ್ತಂಬರಿ": "coriander", "ಕೊತ್ತುಂಬರಿ": "coriander",
+    "dhania": "coriander", "onion": "onion", "வெங்காயம்": "onion", "ಈರುಳ್ಳಿ": "onion",
+    "spinach": "spinach", "palak": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
+    "potato": "potato", "aloo": "potato", "ಆಲೂಗಡ್ಡೆ": "potato",
 }
-APPROVE_WORDS = ["sari", "சரி", "yes", "ha", "haan", "ஆம்", "ok", "confirm"]
-DENY_WORDS = ["illa", "இல்ல", "no", "venam", "வேண்டாம்", "nahi", "cancel", "stop"]
+APPROVE_WORDS = ["sari", "சரி", "ಸರಿ", "yes", "ha", "haan", "ಹೌದು", "ஆம்", "ok", "confirm"]
+DENY_WORDS = ["illa", "இல்ல", "ಇಲ್ಲ", "no", "venam", "வேண்டாம்", "ಬೇಡ", "nahi", "cancel", "stop"]
 
 
 def _parse_quantities(text: str) -> dict[str, int | None]:
     """Extract {product: requested_qty} from a transcript.
-    Handles '20 கிலோ தக்காளி', '3 crates tomato', '10 கொத்து கொத்தமல்லி',
-    Tamil word-numbers, punctuation, and qty-before/after product order.
+    Handles '20 கிலோ தக்காளி' / '20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ', '3 crates tomato', '10 கொத்து கொத்தமல்லி',
+    Tamil/Kannada word-numbers, punctuation, and qty-before/after product order.
     NEVER invents a number — absent numbers stay None (engine fills deterministically)."""
-    tokens = re.findall(r"[\w\u0b80-\u0bff]+", text.lower())
+    tokens = re.findall(r"[\w\u0b80-\u0bff\u0c80-\u0cff]+", text.lower())
     found: dict[str, int | None] = {}
     i = 0
     while i < len(tokens):
         t = tokens[i]
-        v = TAMIL_WORDNUM.get(t, int(t) if t.isdigit() else None)
+        v = WORDNUM.get(t, int(t) if t.isdigit() else None)
         if v is not None:
             mult, j = 1, i + 1
             unit = None
@@ -136,9 +142,15 @@ def extract_intent(payload: dict):
     if not products:
         return {"intent": "out_of_scope", "products": {}, "clarification_needed": True}
     ambiguous = any(q is None for q in products.values())
+    if re.search(r"[\u0b80-\u0bff]", text):
+        lang = "ta"
+    elif re.search(r"[\u0c80-\u0cff]", text):
+        lang = "kn"
+    else:
+        lang = "en"
     return {"intent": "create_restock_order", "products": products,
             "clarification_needed": ambiguous,
-            "language": "ta" if re.search(r"[\u0b80-\u0bff]", text) else "en"}
+            "language": lang}
 
 
 @app.post("/rec")
