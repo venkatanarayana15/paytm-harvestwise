@@ -1,0 +1,71 @@
+{
+  "name": "HarvestWise - 6:30 Briefing",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "30 6 * * *" }
+          ]
+        }
+      },
+      "name": "Schedule 6:30AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&daily=precipitation_probability_max&timezone=Asia%2FKolkata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "key", "value": "OPENWEATHER_KEY" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Weather (IMD-shaped)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "onError": "continueRegularOutput",
+      "notes": "Demo-credible weather for Bengaluru. Option A (shown): open-meteo, no key — delete the query parameter. Option B: OpenWeather key via httpQueryAuth credential. Offline fallback: the HarvestWise API ships a seeded 78% value."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.sid }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "To", "value": "whatsapp:+91XXXXXXXXXX" },
+            { "name": "From", "value": "whatsapp:+14155238886" },
+            { "name": "ContentSid", "value": "HXXXXXXX_BRIEFING_TEMPLATE_SID" },
+            { "name": "ContentVariables", "value": "={{ JSON.stringify({1: String($json.daily.precipitation_probability_max[0])}) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "WhatsApp Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "onError": "continueRegularOutput",
+      "notes": "Template (register in Twilio console): 'Good morning! Tomorrow {{1}}% rain expected. Reply SARI to get today's restocking suggestion.'"
+    }
+  ],
+  "connections": {
+    "Schedule 6:30AM": { "main": [[{ "node": "Weather (IMD-shaped)", "type": "main", "index": 0 }]] },
+    "Weather (IMD-shaped)": { "main": [[{ "node": "WhatsApp Briefing", "type": "main", "index": 0 }]] }
+  }
+}

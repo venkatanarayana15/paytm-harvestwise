@@ -1,0 +1,125 @@
+{
+  "name": "HarvestWise - Dispatch",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "harvestwise-dispatch",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "b1f4c2a1-1111-4a7a-9e01-harvestdw01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "product", "value": "={{ $json.body.product }}", "type": "string" },
+            { "id": "a2", "name": "approval_token", "value": "={{ $json.body.token || $json.body.approval_token }}", "type": "string" },
+            { "id": "a3", "name": "quantity_kg", "value": "={{ $json.body.quantity_kg }}", "type": "number" },
+            { "id": "a4", "name": "supplier", "value": "={{ $json.body.supplier }}", "type": "string" },
+            { "id": "a5", "name": "total_inr", "value": "={{ $json.body.total_inr }}", "type": "number" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract order",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.product }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.approval_token }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Validate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.sid }}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "To", "value": "whatsapp:+91XXXXXXXXXX" },
+            { "name": "From", "value": "whatsapp:+14155238886" },
+            { "name": "ContentSid", "value": "HXXXXXXX_ORDER_TEMPLATE_SID" },
+            { "name": "ContentVariables", "value": "={{ JSON.stringify({1: String($json.quantity_kg), 2: $json.product, 3: $json.supplier, 4: String($json.total_inr)}) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Twilio WhatsApp order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -80],
+      "onError": "continueRegularOutput",
+      "notes": "Credential: httpHeaderAuth named 'twilio-basic' with header Authorization: Basic <base64(ACCOUNT_SID:AUTH_TOKEN)>. Replace To/ContentSid placeholders with verified sandbox values."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"dispatched\", \"product\": $json.product, \"quantity_kg\": $json.quantity_kg, \"supplier\": $json.supplier, \"total_inr\": $json.total_inr, \"whatsapp\": ($json.body && $json.body.sid) ? \"sent\" : \"dispatch_recorded_whatsapp_pending\", \"at\": $now.iso() } }}",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Respond dispatched",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"rejected\", \"reason\": \"missing product or approval_token — nothing dispatched\" }",
+        "options": { "responseCode": 422 }
+      },
+      "name": "Respond rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 120]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Extract order", "type": "main", "index": 0 }]] },
+    "Extract order": { "main": [[{ "node": "Validate", "type": "main", "index": 0 }]] },
+    "Validate": {
+      "main": [
+        [{ "node": "Twilio WhatsApp order", "type": "main", "index": 0 }],
+        [{ "node": "Respond rejected", "type": "main", "index": 0 }]
+      ]
+    },
+    "Twilio WhatsApp order": { "main": [[{ "node": "Respond dispatched", "type": "main", "index": 0 }]] }
+  }
+}

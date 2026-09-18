@@ -1,0 +1,30 @@
+# Paytm Build for India AI Hackathon — Team Workspace
+
+Goal: Win Round 1 (PPT/PDF submission) and carry through to the Bengaluru finale.
+
+## Secrets policy (redacted 2026-09-18)
+All keys live in `.env` files only — never in docs, never in chat logs, never in code.
+- Sarvam API key → `finale/.env` → `SARVAM_API_KEY`
+- n8n access (webhook + MCP token) → `finale/.env` → `N8N_WEBHOOK_URL`, `N8N_MCP_TOKEN`
+- If any key was previously pasted into this file or shared in chats, consider it burned: rotate on the provider dashboard before the finale.
+## Decision (locked)
+- Track: 1 — Merchant Growth AI
+- Niche: perishable-goods micro-merchants (vegetable vendors as hero persona)
+- Product: HarvestWise — voice-first AI growth copilot (WhatsApp + Paytm merchant world)
+- Stack: Sarvam AI (Indic voice/LLM) + n8n (agent orchestration) + Cognee (merchant memory) — the organizers' own partner stack
+
+## Folder map
+- `STATUS.md` — living mission log (phase, countdown, blockers+owners, locked decisions). Read first, update on change.
+- `knowledge/` — hackathon brief, track decision, Paytm facts, partner-stack playbook, pitch strategy, collision analysis, finale doctrine, verified-facts ledger (09 = single source of truth), prompt-engineering pack (10: CoT/ReAct prompts for the Sarvam-105B agent), mentor deep playbook (11: judge rubric, demo choreography, backup protocol, triage matrix)
+- `.opencode/agent/hackathon-mentor.md` — Mentor agent (mode: all — selectable as a primary agent in the TUI switcher AND invocable via `/mentor <question>`; inherits your default model). HERMES 6-pass protocol, guardrails G1-G5, judge-rubric + triage + Q&A control skills. Restart opencode to activate.
+- `deck/deck.html` — the Round 1 deck (self-contained, print-ready 1280x720)
+- `deck/DECK-COPY.md` — slide-by-slide copy for quick edits
+- `deck/*.pdf` — final upload artifact
+
+## Regenerate PDF after editing deck.html
+Open deck.html in the browser (Edge) and Ctrl+P -> Save as PDF (paper size auto = 1280x720, margins none), or run:
+Edge headless (see knowledge/01, bottom).
+
+## Round 1 checklist (from organizers)
+Title Slide / Problem Statement / Proposed Solution / Tech Stack / USP / Impact & Benefits / Business Model
+Upload PDF in the "Round 1 / Rounds" section of the portal. If portal says "You have not reached this round", wait 2-3 hrs and retry.

@@ -1,0 +1,10 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="640" height="280" viewBox="0 0 640 280">
+<rect width="640" height="280" rx="14" fill="#0F172A"/><text x="20" y="30" fill="#93C5FD" font-size="13" font-family="monospace">Cognee causal memory — fallback (print backup)</text>
+<g fill="#EFF6FF" stroke="#BFDBFE"><rect x="20" y="50" width="110" height="36" rx="18"/><rect x="170" y="50" width="120" height="36" rx="18"/><rect x="330" y="50" width="100" height="36" rx="18"/><rect x="470" y="50" width="100" height="36" rx="18"/></g>
+<g fill="#E2E8F0" font-size="11" font-family="monospace" text-anchor="middle"><text x="75" y="72">Lakshmi</text><text x="230" y="72">tomato</text><text x="380" y="72">+18% vel</text><text x="520" y="72">12kg stock</text></g>
+<g stroke="#64748B" stroke-width="1.2" marker-end="url(#a)"><line x1="130" y1="68" x2="170" y2="68"/><line x1="290" y1="68" x2="330" y2="68"/><line x1="430" y1="68" x2="470" y2="68"/></g>
+<defs><marker id="a" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B"/></marker></defs>
+<g fill="#EFF6FF" stroke="#BFDBFE"><rect x="110" y="110" width="120" height="36" rx="18"/><rect x="270" y="110" width="120" height="36" rx="18"/><rect x="110" y="170" width="380" height="36" rx="18" fill="#10B981" stroke="#059669"/></g>
+<g fill="#1E293B" font-size="11" font-family="monospace" text-anchor="middle"><text x="170" y="132">80% rain (IMD)</text><text x="330" y="132">2-day decay</text><text x="300" y="192" fill="white">20kg dispatched → Basavanagudi Mandi</text></g>
+<text x="20" y="250" fill="#64748B" font-size="10" font-family="monospace">LLM explains, engine decides — every number from an Observation</text>
+</svg>

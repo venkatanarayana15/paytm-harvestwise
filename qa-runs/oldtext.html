@@ -1,0 +1,653 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HarvestWise â€” Paytm Build for India AI Hackathon â€” Round 1</title>
+<style>
+  :root{
+    --navy:#052A47; --navy-deep:#041E42; --navy-ink:#0B1F35;
+    --blue:#00BAF2; --blue-d:#0085CA; --blue-l:#E6F7FE;
+    --ink:#12263A; --muted:#5B6B7F; --muted-2:#7C8DA0;
+    --bg:#F2F6FA; --card:#FFFFFF; --line:#DFE8F1;
+    --green:#00B27A; --green-l:#E7F8F1;
+    --amber:#F5A623; --amber-l:#FEF4E3;
+    --red:#E5484D; --red-l:#FDECEC;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  @page{size:1280px 720px;margin:0;}
+  body{font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#DDE6EF;color:var(--ink);}
+  .slide{
+    width:1280px;height:720px;position:relative;overflow:hidden;
+    background:var(--bg);margin:24px auto;border-radius:2px;
+    page-break-after:always;break-after:page;
+    box-shadow:0 10px 40px rgba(4,30,66,.18);
+    display:flex;flex-direction:column;
+  }
+  @media print{
+    body{background:none;margin:0;}
+    .slide{margin:0;border-radius:0;box-shadow:none;}
+  }
+
+  /* ---------- shared ---------- */
+  .pad{padding:52px 64px 64px;}
+  .krow{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+  .chip{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--navy);color:#fff;font-size:12.5px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;padding:7px 14px;border-radius:999px;
+  }
+  .chip .n{background:var(--blue);color:var(--navy-deep);border-radius:999px;
+    width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;}
+  .klabel{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);}
+  h2.title{font-size:40px;line-height:1.08;font-weight:800;letter-spacing:-.5px;color:var(--navy-deep);margin-bottom:10px;}
+  .sub{font-size:16px;color:var(--muted);max-width:1000px;line-height:1.45;}
+  .foot{
+    position:absolute;left:64px;right:64px;bottom:22px;display:flex;justify-content:space-between;align-items:center;
+    font-size:11px;color:var(--muted-2);letter-spacing:.06em;font-weight:600;
+  }
+  .foot b{color:var(--blue-d);font-weight:700;}
+  .src{font-size:10.5px;color:var(--muted-2);line-height:1.35;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 2px 10px rgba(9,40,76,.05);}
+  .card h4{font-size:15.5px;font-weight:800;color:var(--navy-deep);margin-bottom:6px;display:flex;align-items:center;gap:9px;}
+  .card p{font-size:13px;color:var(--muted);line-height:1.5;}
+  .ic{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:999px;}
+  .tag.b{background:var(--blue-l);color:var(--blue-d);}
+  .tag.g{background:var(--green-l);color:#00794F;}
+  .tag.a{background:var(--amber-l);color:#9A6B00;}
+  .tag.r{background:var(--red-l);color:#B3383C;}
+  .bignum{font-size:44px;font-weight:800;letter-spacing:-1px;color:var(--navy-deep);line-height:1;}
+  .bignum .u{font-size:17px;font-weight:700;color:var(--muted);}
+
+  /* ---------- slide 1 title ---------- */
+  .s-title{background:
+    radial-gradient(900px 500px at 82% -10%, rgba(0,186,242,.28), transparent 60%),
+    radial-gradient(700px 420px at -8% 110%, rgba(0,133,202,.30), transparent 55%),
+    linear-gradient(160deg,#06335C 0%, var(--navy-deep) 58%, #03152E 100%);
+    color:#fff;}
+  .s-title .top{display:flex;justify-content:space-between;align-items:center;padding:44px 64px 0;}
+  .event{font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9DC9E8;}
+  .trackchip{background:rgba(0,186,242,.14);border:1px solid rgba(0,186,242,.55);color:#7FE0FF;
+    font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:9px 16px;border-radius:999px;}
+  .s-title .mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 64px;}
+  .brandrow{display:flex;align-items:center;gap:26px;margin-bottom:20px;}
+  .mark{width:88px;height:88px;border-radius:22px;flex:0 0 auto;
+    background:linear-gradient(150deg,#00BAF2,#0072B0);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 14px 40px rgba(0,186,242,.35);}
+  .wordmark{font-size:76px;font-weight:800;letter-spacing:-2.5px;line-height:1;}
+  .wordmark span{color:var(--blue);}
+  .tagline{font-size:22px;color:#C7E4F6;font-weight:600;margin-top:2px;letter-spacing:-.2px;}
+  .pipeline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;}
+  .pl{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.22);color:#DCEBF7;
+    font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:999px;white-space:nowrap;}
+  .pl.first{border-color:rgba(0,186,242,.7);color:#7FE0FF;}
+  .par{color:#5F8FB4;font-weight:800;font-size:13px;}
+  .pitchline{font-size:16px;color:#8FB8D6;max-width:880px;line-height:1.55;margin-top:16px;}
+  .pitchline b{color:#E8F6FF;font-weight:700;}
+  .s-title .bottom{display:flex;justify-content:space-between;align-items:flex-end;padding:0 64px 40px;gap:20px;}
+  .teaminfo{font-size:13px;color:#9DC3DD;text-align:right;line-height:1.6;font-weight:600;}
+
+  /* ---------- stat cards (slide 2) ---------- */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .statcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;border-top:4px solid var(--blue);}
+  .statcard .lab{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-top:8px;}
+
+  /* ---------- slide 3 problem ---------- */
+  .storycard{background:linear-gradient(135deg,var(--navy-deep),#073B66);color:#fff;border-radius:14px;padding:22px 26px;}
+  .storycard .q{font-size:15px;line-height:1.6;color:#DDEBF7;}
+  .storycard .q b{color:#7FE0FF;}
+  .storycard .who{font-size:12px;color:#8FB8D6;margin-top:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
+  .pain{display:flex;flex-direction:column;gap:10px;}
+  .coststrip{background:var(--navy-deep);border-radius:14px;color:#fff;padding:16px 24px;display:flex;align-items:center;gap:18px;}
+  .coststrip .seg{display:flex;flex-direction:column;gap:2px;}
+  .coststrip .v{font-size:21px;font-weight:800;color:#7FE0FF;white-space:nowrap;}
+  .coststrip .k{font-size:10.5px;color:#9DC3DD;letter-spacing:.05em;font-weight:600;text-transform:uppercase;}
+  .coststrip .op{font-size:24px;color:#3F6F96;font-weight:800;}
+  .coststrip .res .v{color:#FFD37E;}
+  .cityline{background:var(--red-l);border:1px solid #F2C7C9;border-radius:12px;padding:10px 18px;margin-top:12px;
+    display:flex;align-items:center;gap:14px;font-size:13px;color:#8A2F33;font-weight:700;}
+  .cityline b{color:#B3383C;}
+
+  /* ---------- slide 4 loop ---------- */
+  .loopwrap{display:grid;grid-template-columns:1.02fr .98fr;gap:34px;align-items:center;}
+  .loop{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .loopcard{border-radius:16px;padding:20px;border:1px solid var(--line);background:#fff;position:relative;box-shadow:0 2px 10px rgba(9,40,76,.05);}
+  .loopcard .step{position:absolute;top:-12px;left:18px;background:var(--blue);color:var(--navy-deep);
+    font-size:11px;font-weight:800;letter-spacing:.1em;border-radius:999px;padding:4px 12px;}
+  .loopcard h4{font-size:17px;font-weight:800;color:var(--navy-deep);margin:8px 0 6px;display:flex;gap:9px;align-items:center;}
+  .loopcard p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+  .loopcard p b{color:var(--ink);}
+  .voicestrip{background:linear-gradient(135deg,#00BAF2,#0072B0);border-radius:14px;color:#fff;padding:18px 24px;margin-top:18px;}
+  .voicestrip .t{font-size:15px;font-weight:800;letter-spacing:.02em;}
+  .voicestrip .d{font-size:12.5px;color:#D9F3FF;line-height:1.5;margin-top:5px;}
+
+  /* ---------- slide 5 demo ---------- */
+  .tl{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;position:relative;margin-top:6px;}
+  .tl::before{content:"";position:absolute;top:23px;left:40px;right:40px;height:2px;background:linear-gradient(90deg,var(--blue),var(--blue-d));opacity:.5;}
+  .tlcol{display:flex;flex-direction:column;gap:10px;position:relative;}
+  .dotstep{width:46px;height:46px;border-radius:50%;background:var(--navy-deep);color:#7FE0FF;border:2px solid var(--blue);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;z-index:1;margin:0 auto;white-space:nowrap;}
+  .tlhead{font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--blue-d);text-transform:uppercase;text-align:center;}
+  .tlbox{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px;flex:1;display:flex;flex-direction:column;gap:7px;box-shadow:0 2px 8px rgba(9,40,76,.05);}
+  .bub{border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.45;}
+  .bub.ai{background:var(--navy-deep);color:#DFF3FF;}
+  .bub.ai b{color:#7FE0FF;}
+  .bub.mer{background:#E9FBEF;color:#0A5C3C;border:1px solid #BEEFD2;}
+  .bub.sys{background:var(--blue-l);color:#0B5E84;border:1px solid #B5E4F9;}
+  .tlbox .res{font-size:11px;color:var(--muted);line-height:1.4;}
+  .tlbox .res b{color:var(--green);font-weight:800;}
+
+  /* ---------- slide 6 stack ---------- */
+  .layers{display:flex;flex-direction:column;gap:11px;}
+  .layer{display:grid;grid-template-columns:212px 1fr;gap:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(9,40,76,.05);}
+  .layer .lh{background:var(--navy-deep);color:#fff;padding:13px 18px;display:flex;flex-direction:column;justify-content:center;gap:3px;}
+  .layer .lh .t{font-size:14px;font-weight:800;}
+  .layer .lh .s{font-size:10px;color:#8FB8D6;letter-spacing:.07em;text-transform:uppercase;font-weight:700;}
+  .layer .lc{padding:11px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .tool{border:1.5px solid var(--blue);background:var(--blue-l);color:var(--navy-deep);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:1px;}
+  .tool small{font-weight:600;font-size:10px;color:#3C7A99;}
+  .plain{font-size:11.5px;color:var(--muted);line-height:1.4;}
+  .guardbar{background:linear-gradient(90deg,#0B3B24,#0F5138);color:#C9F5E2;border-radius:12px;padding:11px 18px;
+    font-size:12px;font-weight:700;display:flex;align-items:center;gap:16px;}
+  .guardbar .gt{color:#8CF2C0;font-weight:800;letter-spacing:.1em;font-size:10.5px;text-transform:uppercase;white-space:nowrap;}
+
+  /* ---------- slide 7 USP table ---------- */
+  .usptable{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(9,40,76,.05);}
+  .usptable th,.usptable td{padding:13px 16px;text-align:left;vertical-align:top;font-size:12.5px;line-height:1.45;}
+  .usptable thead th{background:var(--navy-deep);color:#fff;font-size:12px;font-weight:800;letter-spacing:.04em;}
+  .usptable thead th.hw{background:linear-gradient(135deg,#00BAF2,#0072B0);color:var(--navy-deep);}
+  .usptable tbody th{background:var(--blue-l);color:var(--navy-deep);font-weight:800;font-size:12px;width:150px;}
+  .usptable td{color:var(--muted);border-top:1px solid var(--line);}
+  .usptable td.hwcell{background:#F2FBFF;color:var(--ink);font-weight:600;border-top:1px solid #B5E4F9;}
+  .usptable td b{color:var(--navy-deep);}
+  .moatline{background:var(--navy-deep);border-radius:12px;color:#fff;padding:13px 20px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:14px;margin-top:14px;}
+  .moatline .fl{color:#7FE0FF;letter-spacing:.1em;font-size:10.5px;text-transform:uppercase;white-space:nowrap;}
+
+  /* ---------- slide 8 impact ---------- */
+  .split{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:stretch;}
+  .waterfall{display:flex;align-items:flex-end;gap:14px;height:236px;padding:0 4px;}
+  .wfcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;height:100%;}
+  .wfbar{width:100%;border-radius:10px 10px 4px 4px;position:relative;}
+  .wfbar .wv{position:absolute;top:-24px;left:0;right:0;text-align:center;font-size:13px;font-weight:800;color:var(--navy-deep);white-space:nowrap;}
+  .wfcol .wl{font-size:10.5px;font-weight:700;color:var(--muted-2);text-align:center;line-height:1.3;text-transform:uppercase;letter-spacing:.04em;}
+  .impactli{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line);}
+  .impactli:last-child{border-bottom:none;}
+  .impactli .ic{margin-top:2px;width:26px;height:26px;font-size:13px;}
+  .impactli .tx{font-size:12.5px;color:var(--muted);line-height:1.45;}
+  .impactli .tx b{color:var(--navy-deep);}
+  .kpirow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;}
+  .kpi .v{font-size:20px;font-weight:800;color:var(--blue-d);letter-spacing:-.5px;}
+  .kpi .k{font-size:10px;color:var(--muted-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;}
+
+  /* ---------- slide 9 model ---------- */
+  .tiers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .tier{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:7px;box-shadow:0 2px 8px rgba(9,40,76,.05);}
+  .tier.hot{border:2px solid var(--blue);position:relative;background:linear-gradient(180deg,#F3FBFF,#fff);}
+  .tier .tt{font-size:15px;font-weight:800;color:var(--navy-deep);}
+  .tier .pr{font-size:24px;font-weight:800;color:var(--blue-d);letter-spacing:-.5px;}
+  .tier .pr small{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:0;}
+  .tier ul{list-style:none;display:flex;flex-direction:column;gap:5px;margin-top:3px;}
+  .tier li{font-size:11.5px;color:var(--muted);line-height:1.45;padding-left:15px;position:relative;}
+  .tier li::before{content:"";position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:2px;background:var(--blue);}
+  .tier li b{color:var(--ink);}
+  .ribbon{position:absolute;top:-11px;right:14px;background:var(--blue);color:var(--navy-deep);font-size:10px;font-weight:800;letter-spacing:.1em;padding:4px 10px;border-radius:999px;text-transform:uppercase;}
+  .revrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px;}
+  .rev{background:var(--navy-deep);border-radius:12px;padding:12px 14px;color:#fff;}
+  .rev .rt{font-size:12px;font-weight:800;color:#7FE0FF;margin-bottom:3px;}
+  .rev .rd{font-size:10.5px;color:#A9C6DD;line-height:1.4;}
+  .compbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#00BAF2,#0072B0);border-radius:12px;color:#fff;padding:11px 18px;margin-top:14px;}
+  .compbar .ct{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#D9F3FF;white-space:nowrap;}
+  .compbar .cd{font-size:12px;font-weight:700;line-height:1.4;}
+
+  /* ---------- slide 3 compaction ---------- */
+  .s-problem .krow{margin-bottom:12px;}
+  .s-problem h2.title{font-size:33px;}
+  .s-problem .storycard{padding:16px 20px;}
+  .s-problem .storycard .q{font-size:14.5px;line-height:1.55;}
+  .s-problem .pain{gap:8px;}
+  .s-problem .pain .card{padding:13px 18px;}
+  .s-problem .pain .card p{font-size:12.5px;line-height:1.45;}
+  .s-problem .cityline{margin-top:10px;padding:8px 16px;font-size:12.5px;}
+  .s-problem .coststrip{padding:12px 20px;}
+  /* ---------- slide 6 compaction ---------- */
+  .s-stack .krow{margin-bottom:12px;}
+  .s-stack h2.title{font-size:33px;margin-bottom:6px;}
+  .s-stack .layers{gap:8px;margin-top:6px;}
+  .s-stack .layer{grid-template-columns:200px 1fr;}
+  .s-stack .layer .lh{padding:9px 14px;}
+  .s-stack .layer .lh .t{font-size:13.5px;}
+  .s-stack .layer .lh .s{font-size:9.5px;}
+  .s-stack .layer .lc{padding:8px 14px;gap:9px;}
+  .s-stack .tool{padding:5px 10px;font-size:11.5px;border-radius:9px;}
+  .s-stack .tool small{font-size:9.5px;}
+  .s-stack .plain{font-size:10.5px;}
+  .s-stack .guardbar{padding:9px 16px;font-size:11.5px;margin-top:9px;}
+
+  /* ---------- slide 10 close ---------- */
+  .s-close{background:
+    radial-gradient(900px 500px at 15% -10%, rgba(0,186,242,.25), transparent 60%),
+    radial-gradient(700px 420px at 105% 110%, rgba(0,133,202,.30), transparent 55%),
+    linear-gradient(160deg,#06335C 0%, var(--navy-deep) 58%, #03152E 100%);
+    color:#fff;}
+  .road{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:8px;}
+  .rstep{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:5px;}
+  .rstep .rn{font-size:11px;font-weight:800;color:#7FE0FF;letter-spacing:.12em;text-transform:uppercase;}
+  .rstep .rt2{font-size:14px;font-weight:800;color:#fff;line-height:1.3;}
+  .rstep .rd2{font-size:11.5px;color:#9DC3DD;line-height:1.45;}
+  .closequote{font-size:30px;font-weight:800;line-height:1.3;letter-spacing:-.4px;max-width:1000px;margin-top:8px;}
+  .closequote span{color:var(--blue);}
+  .closemeta{display:flex;gap:34px;margin-top:6px;flex-wrap:wrap;}
+  .cm .a{font-size:11px;font-weight:800;letter-spacing:.14em;color:#7FA9CB;text-transform:uppercase;margin-bottom:5px;}
+  .cm .b{font-size:13.5px;font-weight:700;color:#E8F4FD;}
+</style>
+</head>
+<body>
+
+<!-- ============ SLIDE 1 Â· TITLE ============ -->
+<section class="slide s-title">
+  <div class="top">
+    <div class="event">Paytm Build for India AI Hackathon Â· Bengaluru Edition</div>
+    <div class="trackchip">Track 1 Â· Merchant Growth AI</div>
+  </div>
+  <div class="mid">
+    <div class="brandrow">
+      <div class="mark">
+        <svg width="50" height="50" viewBox="0 0 24 24" fill="none">
+          <path d="M12 21c-.3-3.6-1.5-6.2-3.6-8.2C6.3 10.8 4.9 8.4 4.9 5.6c0-.8.1-1.6.3-2.3 1.4 3.9 4.3 5.4 6.8 5.4 2.5 0 5.4-1.5 6.8-5.4.2.7.3 1.5.3 2.3 0 2.8-1.4 5.2-3.5 7.2-2.1 2-3.3 4.6-3.6 8.2Z" fill="#041E42" opacity=".93"/>
+          <path d="M12 12.5c.9-1.2 2.5-3.5 5.9-4.4" stroke="#041E42" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="wordmark">Harvest<span>Wise</span></div>
+        <div class="tagline">Voice-first autonomous restocking for India's street merchants.</div>
+      </div>
+    </div>
+    <div class="pipeline">
+      <div class="pl first">WhatsApp / Soundbox</div><div class="par">â†’</div>
+      <div class="pl">Sarvam Indic Voice AI</div><div class="par">â†’</div>
+      <div class="pl">Cognee Knowledge Graph</div><div class="par">â†’</div>
+      <div class="pl">n8n Orchestrator</div><div class="par">â†’</div>
+      <div class="pl">Mandi Wholesaler</div>
+    </div>
+    <div class="pitchline">
+      Lakshmi sells vegetables in Bengaluru. Paytm made her a <b>merchant</b> â€” nothing made her a <b>restocker</b>.
+      HarvestWise listens, predicts spoilage, recalculates her order and dispatches it to her mandi wholesaler â€”
+      <b>without asking her to type a single word.</b>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="teaminfo">
+      Team Sairam Â· Venkata Narayana G V Â· Malaravan P<br>
+      Round 1 Submission Â· September 2026
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 2 Â· OPPORTUNITY ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">1</span>Context</span><span class="klabel">The Opportunity</span></div>
+  <h2 class="title">Paytm made them merchants.<br>Nobody made them restockers.</h2>
+  <p class="sub" style="margin-bottom:22px;">India's largest merchant network is also its least-served growth market: payments are digital, but the highest-stakes daily decision â€” what to buy at 4:30 AM â€” still runs on guesswork.</p>
+  <div class="grid3" style="margin-bottom:18px;">
+    <div class="statcard">
+      <div class="bignum">30M<span class="u">+</span></div>
+      <div class="lab">Merchants in Paytm's ecosystem</div>
+      <p style="margin-top:6px;">The long tail: kiranas, carts, stalls â€” the backbone of India's daily commerce.</p>
+    </div>
+    <div class="statcard">
+      <div class="bignum">1.57<span class="u"> Cr</span></div>
+      <div class="lab">Merchant device subscriptions (Soundbox / PoS)</div>
+      <p style="margin-top:6px;">A proven billing rail merchants already pay on â€” and the anchor for cross-sell.</p>
+    </div>
+    <div class="statcard">
+      <div class="bignum">8<span class="u"> Cr</span></div>
+      <div class="lab">Monthly transacting users</div>
+      <p style="margin-top:6px;">Demand-side scale that makes every merchant insight immediately actionable.</p>
+    </div>
+  </div>
+  <div class="card" style="border-left:5px solid var(--blue);display:flex;gap:20px;align-items:center;">
+    <div style="flex:1;">
+      <h4>The locked layer of value</h4>
+      <p>Paytm sees the transactions â€” but the merchant's most consequential decision, <b>what to stock tomorrow at what quantity</b>, happens blind at the mandi gate. Paytm's own AI (ARMS) optimizes merchant lifecycle <i>internally</i>; the merchant's own P&amp;L still runs on intuition. That missing merchant-facing layer is where the next phase of Paytm's growth lives.</p>
+    </div>
+    <div style="flex:0 0 300px;background:var(--blue-l);border-radius:12px;padding:16px 18px;">
+      <p style="font-size:12.5px;color:#0B5E84;line-height:1.55;"><b style="color:var(--navy-deep);">Why now:</b> Indic voice AI (Sarvam), agent orchestration (n8n) and knowledge-graph memory (Cognee) matured together for the first time â€” making a copilot for a non-English, non-dashboard user finally buildable.</p>
+    </div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>Sources: Paytm blog &amp; investor disclosures, 2025â€“26</div></div>
+</section>
+
+<!-- ============ SLIDE 3 Â· PROBLEM ============ -->
+<section class="slide pad s-problem">
+  <div class="krow"><span class="chip"><span class="n">2</span>Round 1</span><span class="klabel">Problem Statement</span></div>
+  <h2 class="title">Her inventory rots. Her margin goes with it.</h2>
+  <div style="display:grid;grid-template-columns:1.08fr .92fr;gap:20px;margin:10px 0 12px;">
+    <div>
+      <div class="storycard">
+        <div class="q">"I'm at Kalasipalya mandi by 4:30 AM with <b>â‚¹3,500 in my pocket</b>. I buy tomatoes, greens and beans on one heuristic: what sold yesterday. At 3 PM an unpredicted thunderstorm empties the street. By 9 PM I'm dumping <b>â‚¹400 of rotting greens</b> in the garbage. <b>I earn on Paytm. I restock on guesswork.</b>"</div>
+        <div class="who">â€” Lakshmi Â· vegetable cart Â· Basavanagudi, Bengaluru</div>
+      </div>
+      <div class="cityline">
+        <span style="font-size:18px;">âš </span>
+        <span>Modeled across Bengaluru's <b>12,000+ vegetable vendors</b>: <b>~â‚¹175 Cr/yr in spoilage losses</b> (â‚¹400 Ã— 12,000 Ã— 365) â€” losses like these push vendors into informal high-interest debt (<i>meter baddi</i>). Baseline to be validated in pilot.</span>
+      </div>
+    </div>
+    <div class="pain">
+      <div class="card" style="border-left:4px solid var(--red);">
+        <h4><span class="ic" style="background:var(--red-l);">ðŸ¥€</span>25â€“35% daily spoilage</h4>
+        <p>Perishable stock bought at 4:30 AM on intuition, sold across a 12-hour day. Evening leftovers go out at distress prices â€” <b>what doesn't sell is a 100% cash loss</b>.</p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--amber);">
+        <h4><span class="ic" style="background:var(--amber-l);">ðŸŽ²</span>4:30 AM &lt;â€”&gt; 3 PM disconnect</h4>
+        <p>Procurement decisions ignore the signals that actually move demand: <b>afternoon rain, micro-festivals, local UPI purchase velocity, mandi price swings</b> â€” all available, none connected.</p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--blue);">
+        <h4><span class="ic" style="background:var(--blue-l);">ðŸ“µ</span>Tools not built for her</h4>
+        <p>Dashboards need literacy, dry hands and downtime she doesn't have. Chatbots only talk. <b>Wet hands, continuous customers, vernacular-only</b> â€” the interface must be speech.</p>
+      </div>
+    </div>
+  </div>
+  <div class="coststrip">
+    <div class="seg"><div class="v">â‚¹3,500 / day</div><div class="k">Avg. working capital</div></div>
+    <div class="op">Ã—</div>
+    <div class="seg"><div class="v">~30%</div><div class="k">Unsold at close</div></div>
+    <div class="op">âˆ’</div>
+    <div class="seg"><div class="v">evening salvage</div><div class="k">Distress discounting</div></div>
+    <div class="op">=</div>
+    <div class="seg res"><div class="v">â‚¹400 / day</div><div class="k">Net loss Â· â‰ˆâ‚¹12,000/mo</div></div>
+    <div style="margin-left:auto;font-size:10.5px;color:#9DC3DD;max-width:210px;line-height:1.4;">Up to <b style="color:#FFD37E;">30% of household take-home</b> erased Â· illustrative model, spoilage band 25â€“35%</div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>Lakshmi = representative persona Â· 12,000+ vendors (working est.) Â· 60 lakh+ street vendors in India (PM SVANidhi)</div></div>
+</section>
+
+<!-- ============ SLIDE 4 Â· SOLUTION ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">3</span>Round 1</span><span class="klabel">Proposed Solution</span></div>
+  <h2 class="title">A restocking loop that speaks, acts &amp; remembers</h2>
+  <div class="loopwrap" style="margin-top:10px;">
+    <div class="loop">
+      <div class="loopcard"><div class="step">1 Â· OBSERVE</div>
+        <h4>ðŸ‘ï¸</h4>
+        <p><b>Watches her world</b> â€” hourly UPI sales velocity (Paytm signals, with consent), IMD rain probability, festival calendar, mandi rates, and <b>perishable decay tables</b> per commodity.</p>
+      </div>
+      <div class="loopcard"><div class="step">2 Â· PREDICT</div>
+        <h4>ðŸ”®</h4>
+        <p><b>Forecasts spoilage &amp; demand</b> in her words: <i>"Rain at 3 PM â€” coriander shelf-life drops to 4 hours; your rainy-day coriander sales fall 40%."</i></p>
+      </div>
+      <div class="loopcard"><div class="step">3 Â· ACT</div>
+        <h4>âš¡</h4>
+        <p><b>Recalculates and dispatches</b> â€” resizes her order (10 â†’ 6 bundles), confirms with her by voice, sends the revised buy-order to her mandi wholesaler on WhatsApp.</p>
+      </div>
+      <div class="loopcard"><div class="step">4 Â· LEARN</div>
+        <h4>ðŸ§ </h4>
+        <p><b>Remembers her business</b> â€” which recalcs worked, which didn't, and why. Next week's order starts from this week's evidence, not zero.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="border-left:5px solid var(--green);margin-bottom:14px;">
+        <h4>No new app. No login. No literacy barrier.</h4>
+        <p>The interface is <b>voice on WhatsApp</b> â€” plus the morning briefing <b>played on her Paytm Soundbox</b>. The Soundbox already sits on her cart, already speaks her language. We upgrade it from payment confirmation to operational assistant.</p>
+      </div>
+      <div class="card" style="border-left:5px solid var(--blue);">
+        <h4>Not another chatbot</h4>
+        <p>Chatbots <b>advise</b> ("stock less"). HarvestWise <b>finishes the job</b> â€” it recalculates the order and dispatches it to the wholesaler, with a human voice-approval gate before anything that touches money.</p>
+      </div>
+    </div>
+  </div>
+  <div class="voicestrip">
+    <div class="t">One loop, every morning: Observe â†’ Predict â†’ Act â†’ Learn.</div>
+    <div class="d">Spoilage prevented before it's bought, orders dispatched before the mandi gate, outcomes measured the same evening â€” compounding daily into her take-home and Paytm's GMV.</div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>4 Â· Solution</div></div>
+</section>
+
+<!-- ============ SLIDE 5 Â· A DAY WITH HARVESTWISE ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">3+</span>Round 1</span><span class="klabel">Proposed Solution Â· Experience &amp; Demo Script</span></div>
+  <h2 class="title">A day with HarvestWise â€” in Kannada</h2>
+  <p class="sub" style="margin-bottom:14px;">The product story â€” the finale demo compresses it to one voice command â†’ one explained recalculation â†’ one dispatched order â†’ one remembered outcome.</p>
+  <div class="tl">
+    <div class="tlcol">
+      <div class="dotstep">6:30</div>
+      <div class="tlhead">AM Â· Briefing</div>
+      <div class="tlbox">
+        <div class="bub ai"> Namaskara Lakshmi! Today: 80% chance of rain at 3 PM. Order fewer tomatoes; leafy greens will sell out by evening. Best mandi rate: â‚¹18/kg at Kalasipalya.</div>
+        <div class="res">Auto-sent by the 6:30 AM n8n workflow â€” voice on WhatsApp <b>and played on her Soundbox</b>. 30 seconds, zero taps.</div>
+      </div>
+    </div>
+    <div class="tlcol">
+      <div class="dotstep">9:14</div>
+      <div class="tlhead">AM Â· She orders</div>
+      <div class="tlbox">
+        <div class="bub mer"> à²Ÿà³Šà²®à³à²¯à²¾à²Ÿà³Š 3 à²¬à²¾à²•à³à²¸à³, à²•à³Šà²¤à³à²¤à²‚à²¬à²°à²¿ 10 à²•à²Ÿà³à²Ÿà³. ("3 crates of tomatoes, 10 bundles of coriander.")</div>
+        <div class="bub ai">Order noted. One flag: rain at 3 PM â€” coriander lasts only 4 hours in humidity, and your rainy-day coriander sales drop ~40%.</div>
+        <div class="res">Sarvam ASR â†’ intent + entities â†’ Cognee raises the spoilage flag against her history.</div>
+      </div>
+    </div>
+    <div class="tlcol">
+      <div class="dotstep">11:02</div>
+      <div class="tlhead">AM Â· It recalculates</div>
+      <div class="tlbox">
+        <div class="bub sys"> Revised: 6 bundles of coriander (not 10), 3 crates tomatoes. Wholesaler Ravi anna â€” â‚¹546. Approve?</div>
+        <div class="bub mer"> à²¹à³Œà²¦à³, à²•à²³à³à²¹à²¿à²¸à³. ("Yes, send it.")</div>
+        <div class="res"><b>Dispatched:</b> buy-order sent to the wholesaler, stock sheet updated â€” n8n gate: nothing moves without her "yes".</div>
+      </div>
+    </div>
+    <div class="tlcol">
+      <div class="dotstep">8:30</div>
+      <div class="tlhead">PM Â· It learns</div>
+      <div class="tlbox">
+        <div class="bub ai"> Today: sold out by 7:15 PM, zero coriander waste. You kept â‚¹1,940 you'd have discounted away. This week: +â‚¹4,100 vs last.</div>
+        <div class="res">Logged to her Cognee memory graph: <b>"Rain recalc â€” worked, â‚¹1,940 kept."</b> Next storm, she doesn't have to think.</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>5 Â· Experience</div></div>
+</section>
+
+<!-- ============ SLIDE 6 Â· TECH STACK ============ -->
+<section class="slide pad s-stack">
+  <div class="krow"><span class="chip"><span class="n">4</span>Round 1</span><span class="klabel">Technology / Tech Stack</span></div>
+  <h2 class="title" style="font-size:36px;">Built on the organizers' own stack â€” one job each</h2>
+  <div class="layers" style="margin-top:8px;">
+    <div class="layer">
+      <div class="lh"><div class="t">Experience</div><div class="s">Where the merchant lives</div></div>
+      <div class="lc">
+        <div class="tool">WhatsApp Business API<small>voice notes, in &amp; out</small></div>
+        <div class="tool">Paytm Soundbox<small>morning audio briefing</small></div>
+        <div class="tool">Business with Paytm<small>optional dashboard view</small></div>
+        <div class="plain">No new app, no login, no typing. Voice is the entire UI; the Soundbox is the loudspeaker.</div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="lh"><div class="t">Intelligence</div><div class="s">Sarvam AI Â· Indic speech layer</div></div>
+      <div class="lc">
+        <div class="tool">Sarvam Speech-to-Text<small>ASR Â· 22+ Indic languages</small></div>
+        <div class="tool">Sarvam LLM<small>intent + entities + reasoning</small></div>
+        <div class="tool">Sarvam Text-to-Speech<small>natural voice Â· 11 languages</small></div>
+        <div class="plain">Indic-native understanding â€” not an English product with translation bolted on.</div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="lh"><div class="t">Decision Core</div><div class="s">Cognee Â· causal knowledge graphs</div></div>
+      <div class="lc">
+        <div class="tool">Merchant memory graph<small>her history Â· what worked</small></div>
+        <div class="tool">Commodity decay tables<small>shelf-life Ã— humidity Ã— rain</small></div>
+        <div class="tool">Cold-start patterns<small>anonymized cross-merchant</small></div>
+        <div class="plain">Shelf-life Ã— rain Ã— her UPI velocity â€” the causal layer behind every recalc.</div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="lh"><div class="t">Orchestration</div><div class="s">n8n Â· event-driven actions</div></div>
+      <div class="lc">
+        <div class="tool">n8n 6:30 AM workflow<small>briefing Â· WhatsApp + Soundbox</small></div>
+        <div class="tool">n8n order dispatcher<small>revised buy-order â†’ wholesaler</small></div>
+        <div class="tool">n8n approval gates<small>no money action without "yes"</small></div>
+        <div class="plain">Event-driven dispatch to mandi wholesalers; escalation &amp; fallback built in.</div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="lh"><div class="t">Data</div><div class="s">Consent-first signals</div></div>
+      <div class="lc">
+        <div class="tool">Paytm merchant signals<small>hourly UPI velocity Â· consent</small></div>
+        <div class="tool">IMD weather API<small>afternoon rain probability</small></div>
+        <div class="tool">Mandi rate feeds<small>public daily price feeds</small></div>
+        <div class="plain">Demo runs on Paytm-transaction-shaped seeded data (labeled as such); production stays consent-first inside Paytm's rails.</div>
+      </div>
+    </div>
+  </div>
+  <div class="guardbar" style="margin-top:11px;"><span class="gt">âš‘ Guardrails are the product</span>
+    <span>DPDP-aligned Â· federated learning (patterns shared, raw data never) Â· human approval on every money action Â· every recalc explained &amp; undoable Â· full audit trail</span>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>6 Â· Architecture</div></div>
+</section>
+
+<!-- ============ SLIDE 7 Â· USP ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">5</span>Round 1</span><span class="klabel">Unique Selling Proposition</span></div>
+  <h2 class="title" style="font-size:36px;">Advice is cheap. Closed loops are rare.</h2>
+  <p class="sub" style="margin-bottom:16px;">Every alternative stops at a screen or a sentence. HarvestWise is the only one that speaks her language, recalculates her order, dispatches it, and remembers her business.</p>
+  <table class="usptable">
+    <thead>
+      <tr>
+        <th style="width:150px;">Evaluation</th>
+        <th>Traditional merchant tools</th>
+        <th>Generic AI chatbots</th>
+        <th class="hw">HarvestWise</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>Input modality</th>
+        <td>English forms &amp; dashboards â€” needs literacy, dry hands, downtime</td>
+        <td>Text-only chat â€” assumes she can type</td>
+        <td class="hwcell"><b>Zero-touch Indic voice notes</b> on WhatsApp (Sarvam) â€” she talks; that's the whole UI</td>
+      </tr>
+      <tr>
+        <th>Decision intelligence</th>
+        <td>Static inventory tallying â€” backwards-looking</td>
+        <td>Generic public advice â€” no context, no memory</td>
+        <td class="hwcell"><b>Causal knowledge graph:</b> shelf-life Ã— rain Ã— her hourly UPI velocity (Cognee)</td>
+      </tr>
+      <tr>
+        <th>Workflow completion</th>
+        <td>Manual execution â€” she still does the work</td>
+        <td>Advises only â€” "stock less", then stops</td>
+        <td class="hwcell"><b>Closed-loop procurement:</b> recalculated buy-order dispatched to her mandi wholesaler (n8n)</td>
+      </tr>
+      <tr>
+        <th>Hardware tie-in</th>
+        <td>None</td>
+        <td>None</td>
+        <td class="hwcell"><b>Morning audio briefing on Paytm Soundbox</b> â€” payment speaker upgraded to operational assistant</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="moatline"><span class="fl">MOAT</span>
+    Per-merchant memory graph (Cognee) Ã— vernacular closed loop (Sarvam + n8n) Ã— Soundbox/Paytm-native distribution â€” a compounding data advantage every single day.
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>7 Â· USP</div></div>
+</section>
+
+<!-- ============ SLIDE 8 Â· IMPACT ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">6</span>Round 1</span><span class="klabel">Impact &amp; Benefits</span></div>
+  <h2 class="title" style="font-size:36px;">Waste is her biggest expense. We give 60% of it back.</h2>
+  <div class="split" style="margin-top:8px;">
+    <div class="card">
+      <h4>Lakshmi's monthly take-home <span class="tag a">Illustrative model</span></h4>
+      <div class="waterfall">
+        <div class="wfcol"><div class="wfbar" style="height:60%;background:linear-gradient(180deg,#4C6E8E,#3A5A78);"><div class="wv">â‚¹21,000</div></div><div class="wl">Base take-home<br>(~20% margin)</div></div>
+        <div class="wfcol"><div class="wfbar" style="height:21%;background:linear-gradient(180deg,#00B27A,#008F62);"><div class="wv">+â‚¹7,200</div></div><div class="wl">Spoilage preserved<br>(60% reduction)</div></div>
+        <div class="wfcol"><div class="wfbar" style="height:81%;background:linear-gradient(180deg,#00BAF2,#005F8F);outline:2px solid #00BAF2;outline-offset:2px;"><div class="wv">â‚¹28,200</div></div><div class="wl">New take-home<br>+34%</div></div>
+      </div>
+      <div class="src" style="margin-top:14px;">Assumes â‚¹3,500 avg. daily working capital Ã— 30 selling days, ~20% gross margin, â‚¹400/day net spoilage loss after evening salvage. The 60% spoilage-reduction target (â‚¹240/day â‰ˆ â‚¹7,200/mo) is the pilot metric we commit to validating â€” not a claim.</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;">
+      <h4>What Paytm wins</h4>
+      <div class="impactli"><span class="ic" style="background:var(--blue-l);">ðŸ”Š</span><div class="tx"><b>Soundbox upgraded:</b> from passive payment-confirmation speaker to <b>active operational assistant</b> â€” a deeper, stickier device relationship.</div></div>
+      <div class="impactli"><span class="ic" style="background:var(--green-l);">ðŸ“ˆ</span><div class="tx"><b>GMV up:</b> better-stocked merchants capture demand they currently miss â€” target <b>+8% GMV per merchant</b>.</div></div>
+      <div class="impactli"><span class="ic" style="background:var(--amber-l);">ðŸ¦</span><div class="tx"><b>Underwriting data moat:</b> proprietary inventory &amp; procurement telemetry derisks <b>Paytm Merchant Loans</b> â€” replacing "meter baddi" with formal credit.</div></div>
+      <div class="impactli"><span class="ic" style="background:var(--red-l);">â¤ï¸</span><div class="tx"><b>Mission delivered:</b> financial inclusion that shows up as a healthier family P&amp;L â€” the story of Build for India.</div></div>
+      <div class="kpirow">
+        <div class="kpi"><div class="v">â‚¹7,200</div><div class="k">Preserved / vendor / mo*</div></div>
+        <div class="kpi"><div class="v">â‚¹105 Cr+</div><div class="k">Working capital / yr Â· 12k vendors*</div></div>
+        <div class="kpi"><div class="v">â‚¹175 Cr+</div><div class="k">Current annual spoilage loss (city-wide est.)</div></div>
+      </div>
+      <div class="src" style="margin-top:10px;">*Model: 12,000 vendors Ã— â‚¹240/day Ã— 365 â€” directional; validated in pilot. Impact framed as money preserved, not vanity metrics.</div>
+    </div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>8 Â· Impact</div></div>
+</section>
+
+<!-- ============ SLIDE 9 Â· BUSINESS MODEL ============ -->
+<section class="slide pad">
+  <div class="krow"><span class="chip"><span class="n">7</span>Round 1</span><span class="klabel">Business Model</span></div>
+  <h2 class="title" style="font-size:36px;">Billed where she already pays. Free where she starts.</h2>
+  <div class="tiers">
+    <div class="tier">
+      <div class="tt">Seed</div>
+      <div class="pr">â‚¹0<small> / forever</small></div>
+      <ul>
+        <li><b>Daily demand alerts</b> â€” weather + spoilage risk, one voice note + Soundbox briefing</li>
+        <li>Yesterday's sales recap</li>
+        <li>Builds the daily habit â€” <b>zero CAC</b> via Paytm for Business &amp; Soundbox base</li>
+      </ul>
+    </div>
+    <div class="tier hot">
+      <div class="ribbon">Settlement-billed</div>
+      <div class="tt">Pro</div>
+      <div class="pr">â‚¹149<small> / month</small></div>
+      <ul>
+        <li><b>Autonomous restocking:</b> order recalculation + dispatch to her wholesaler</li>
+        <li>Price-drop supplier alerts Â· end-of-day <b>P&amp;L voice audit</b></li>
+        <li>Proposed billing: <b>settlement-linked micro-deduction</b> â€” subject to Paytm integration approval; <b>simulated in our prototype</b>. No invoice, no friction.</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <div class="tt">Platform Revenues</div>
+      <div class="pr">Take-rate<small> on value created</small></div>
+      <ul>
+        <li><b>Supplier marketplace:</b> % on executed mandi orders</li>
+        <li><b>Credit distribution:</b> procurement telemetry derisks Paytm Merchant Loans</li>
+        <li><b>Anonymized demand curves</b> (DPDP-compliant) for supply-chain aggregators &amp; mandi logistics planning</li>
+      </ul>
+    </div>
+  </div>
+  <div class="revrow">
+    <div class="rev"><div class="rt">Why merchants buy</div><div class="rd">â‚¹149/mo vs â‚¹7,200/mo preserved â€” pays for itself in one saved evening of stock.</div></div>
+    <div class="rev"><div class="rt">Why it compounds</div><div class="rd">Every day improves her memory graph â€” advice quality compounds, churn falls.</div></div>
+    <div class="rev"><div class="rt">Unit economics</div><div class="rd">Zero-CAC Paytm-native distribution Ã— 80%+ SaaS margin Ã— data flywheel into lending.</div></div>
+    <div class="rev"><div class="rt">Why Paytm wins</div><div class="rd">The deepest merchant lock-in since the Soundbox: the device confirmed payments; we grow them.</div></div>
+  </div>
+  <div class="compbar"><span class="ct">The wedge â†’ the platform</span>
+    <div class="cd">Start: perishable carts &amp; stalls (highest pain, clearest signal) â†’ kirana fresh categories â†’ 30M+ merchants as the daily restocking layer of the Paytm ecosystem.</div>
+  </div>
+  <div class="foot"><div><b>HarvestWise</b> Â· Track 1: Merchant Growth AI</div><div>9 Â· Business Model</div></div>
+</section>
+
+<!-- ============ SLIDE 10 Â· ROADMAP & CLOSE ============ -->
+<section class="slide s-close pad">
+  <div class="krow"><span class="chip" style="background:rgba(0,186,242,.15);border:1px solid rgba(0,186,242,.5);"><span class="n" style="background:#00BAF2;">â†’</span>Next</span><span class="klabel" style="color:#7FA9CB;">Roadmap Â· Team Â· Ask</span></div>
+  <h2 class="title" style="color:#fff;">From this deck to a pilot</h2>
+  <div class="road">
+    <div class="rstep"><div class="rn">Now â€” Finale</div><div class="rt2">MVP on partner stack</div><div class="rd2">Synthetic 90-day sales data; 3 n8n workflows (briefing, order recalc + dispatch, day-wrap learning); Sarvam voice loop; Cognee memory. Live demo, one phone.</div></div>
+    <div class="rstep"><div class="rn">Months 1â€“3</div><div class="rt2">500-merchant pilot</div><div class="rd2">KR Market, Russell Market &amp; Madivala with vendor associations + Paytm's merchant network. Validate the 60% spoilage-reduction metric.</div></div>
+    <div class="rstep"><div class="rn">Months 4â€“6</div><div class="rt2">Paytm-native integration</div><div class="rd2">API partnership with Paytm for Business; Soundbox briefing rail; mandi logistics channels wired into n8n dispatch.</div></div>
+    <div class="rstep"><div class="rn">Beyond</div><div class="rt2">The restocking layer</div><div class="rd2">Perishables â†’ kirana fresh â†’ all categories. Procurement telemetry â†’ merchant credit. Every merchant, a copilot.</div></div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+    <div class="closequote">"Every morning at 4:30, India's merchants guess.<br>From tomorrow, they guess <span>with a copilot.</span>"</div>
+  </div>
+  <div class="closemeta">
+    <div class="cm"><div class="a">Team</div><div class="b">Sairam â€” Venkata Narayana G V Â· Malaravan P</div></div>
+    <div class="cm"><div class="a">Built with</div><div class="b">Sarvam AI Â· n8n Â· Cognee</div></div>
+    <div class="cm"><div class="a">Ask</div><div class="b">A 500-merchant pilot with Paytm's network</div></div>
+    <div class="cm" style="margin-left:auto;text-align:right;"><div class="a">&nbsp;</div><div class="b" style="color:#7FE0FF;">Solve with AI. Build for India.</div></div>
+  </div>
+</section>
+
+</body>
+</html>
+

@@ -1,0 +1,109 @@
+{
+  "name": "HarvestWise - Day-Wrap Learning",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 9 * * *" }
+          ]
+        }
+      },
+      "name": "Schedule 9:00AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "d1", "name": "merchant_id", "value": "=lakshmi", "type": "string" },
+            { "id": "d2", "name": "products_ordered", "value": "={{ $json.body.products || {} }}", "type": "object" },
+            { "id": "d3", "name": "spoilage_prevented", "value": "={{ $json.body.spoilage_prevented || 0 }}", "type": "number" },
+            { "id": "d4", "name": "total_ordered_inr", "value": "={{ $json.body.total_inr || 0 }}", "type": "number" },
+            { "id": "d5", "name": "sold_out_time", "value": "={{ $json.body.sold_out_time || null }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract day-end",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "e1", "name": "learned", "value": "={{ $json.sold_out_time ? 'sold_out' : ($json.spoilage_prevented > 0 ? 'spoilage_avoided' : 'normal') }}", "type": "string" },
+            { "id": "e2", "name": "confidence_score", "value": "={{ $json.sold_out_time ? 1.0 : 0.7 }}", "type": "number" },
+            { "id": "e3", "name": "timestamp", "value": "={{ $now.iso() }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Create learning entry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $credentials.cognee_url }}/api/v1/harvest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "merchant_id", "value": "={{ $json.merchant_id }}" },
+            { "name": "event_type", "value": "day_wrap" },
+            { "name": "data", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "learned", "value": "={{ $json.learned }}" },
+            { "name": "confidence_score", "value": "={{ $json.confidence_score }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Cognee learn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0],
+      "onError": "continueRegularOutput",
+      "notes": "Updates causal memory: what worked, what didn't. Fallback: local JSON write if Cognee unavailable."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $credentials.api_url }}/memory",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "merchant_id", "value": "={{ $json.merchant_id }}" },
+            { "name": "learned_entry", "value": "={{ JSON.stringify($json) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Local memory update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "onError": "ignore",
+      "notes": "Fallback: writes to Cognee/memory.json if Cognee cloud unavailable."
+    }
+  ],
+  "connections": {
+    "Schedule 9:00AM": { "main": [[{ "node": "Extract day-end", "type": "main", "index": 0 }]] },
+    "Extract day-end": { "main": [[{ "node": "Create learning entry", "type": "main", "index": 0 }]] },
+    "Create learning entry": { "main": [[{ "node": "Cognee learn", "type": "main", "index": 0 }]] },
+    "Cognee learn": { "main": [[{ "node": "Local memory update", "type": "main", "index": 0 }]] }
+  }
+}

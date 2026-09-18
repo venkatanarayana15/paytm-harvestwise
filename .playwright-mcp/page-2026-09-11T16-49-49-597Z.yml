@@ -1,0 +1,444 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: Paytm Build for India AI Hackathon · Bengaluru Edition
+      - generic [ref=e5]: Track 1 · Merchant Growth AI
+    - generic [ref=e6]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: HarvestWise
+        - generic [ref=e14]: Voice-first autonomous restocking for India's street merchants.
+      - generic [ref=e15]:
+        - generic [ref=e16]: WhatsApp / Soundbox
+        - generic [ref=e17]: →
+        - generic [ref=e18]: Sarvam Indic Voice AI
+        - generic [ref=e19]: →
+        - generic [ref=e20]: Cognee Knowledge Graph
+        - generic [ref=e21]: →
+        - generic [ref=e22]: n8n Orchestrator
+        - generic [ref=e23]: →
+        - generic [ref=e24]: Mandi Wholesaler
+      - generic [ref=e25]: Lakshmi sells vegetables in Bengaluru. Paytm made her a merchant — nothing made her a restocker. HarvestWise listens, predicts spoilage, recalculates her order and dispatches it to her mandi wholesaler — without asking her to type a single word.
+    - generic [ref=e26]: Team [TEAM NAME] · [Member 1] · [Member 2] · [Member 3] Round 1 Submission · September 2026
+  - generic [ref=e28]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: "1"
+        - text: Context
+      - generic [ref=e32]: The Opportunity
+    - heading "Paytm made them merchants. Nobody made them restockers." [level=2] [ref=e33]: Paytm made them merchants.Nobody made them restockers.
+    - paragraph [ref=e34]: "India's largest merchant network is also its least-served growth market: payments are digital, but the highest-stakes daily decision — what to buy at 4:30 AM — still runs on guesswork."
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]: 30M+
+        - generic [ref=e38]: Merchants in Paytm's ecosystem
+        - paragraph [ref=e39]: "The long tail: kiranas, carts, stalls — the backbone of India's daily commerce."
+      - generic [ref=e40]:
+        - generic [ref=e41]: 1.57 Cr
+        - generic [ref=e42]: Merchant device subscriptions (Soundbox / PoS)
+        - paragraph [ref=e43]: A proven billing rail merchants already pay on — and the anchor for cross-sell.
+      - generic [ref=e44]:
+        - generic [ref=e45]: 8 Cr
+        - generic [ref=e46]: Monthly transacting users
+        - paragraph [ref=e47]: Demand-side scale that makes every merchant insight immediately actionable.
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - heading "The locked layer of value" [level=4] [ref=e50]
+        - paragraph [ref=e51]: Paytm sees the transactions — but the merchant's most consequential decision, what to stock tomorrow at what quantity, happens blind at the mandi gate. Paytm's own AI (ARMS) optimizes merchant lifecycle internally; the merchant's own P&L still runs on intuition. That missing merchant-facing layer is where the next phase of Paytm's growth lives.
+      - paragraph [ref=e53]: "Why now: Indic voice AI (Sarvam), agent orchestration (n8n) and knowledge-graph memory (Cognee) matured together for the first time — making a copilot for a non-English, non-dashboard user finally buildable."
+    - generic [ref=e54]:
+      - generic [ref=e55]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e56]: "Sources: Paytm blog & investor disclosures, 2025–26"
+  - generic [ref=e57]:
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]: "2"
+        - text: Round 1
+      - generic [ref=e61]: Problem Statement
+    - heading "Her inventory rots. Her margin goes with it." [level=2] [ref=e62]
+    - generic [ref=e63]:
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: "\"I'm at Kalasipalya mandi by 4:30 AM with ₹3,500 in my pocket. I buy tomatoes, greens and beans on one heuristic: what sold yesterday. At 3 PM an unpredicted thunderstorm empties the street. By 9 PM I'm dumping ₹400 of rotting greens in the garbage. I earn on Paytm. I restock on guesswork.\""
+          - generic [ref=e67]: — Lakshmi · vegetable cart · Basavanagudi, Bengaluru
+        - generic [ref=e68]:
+          - generic [ref=e69]: ⚠
+          - generic [ref=e70]: "Scaled across Bengaluru's 12,000+ vegetable vendors: ₹175+ Crore erased every year — and losses like these push vendors into informal high-interest debt (meter baddi)."
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - heading "🥀 25–35% daily spoilage" [level=4] [ref=e73]:
+            - generic [ref=e74]: 🥀
+            - text: 25–35% daily spoilage
+          - paragraph [ref=e75]: Perishable stock bought at 4:30 AM on intuition, sold across a 12-hour day. Evening leftovers go out at distress prices — what doesn't sell is a 100% cash loss.
+        - generic [ref=e76]:
+          - heading "🎲 4:30 AM <—> 3 PM disconnect" [level=4] [ref=e77]:
+            - generic [ref=e78]: 🎲
+            - text: 4:30 AM <—> 3 PM disconnect
+          - paragraph [ref=e79]: "Procurement decisions ignore the signals that actually move demand: afternoon rain, micro-festivals, local UPI purchase velocity, mandi price swings — all available, none connected."
+        - generic [ref=e80]:
+          - heading "📵 Tools not built for her" [level=4] [ref=e81]:
+            - generic [ref=e82]: 📵
+            - text: Tools not built for her
+          - paragraph [ref=e83]: Dashboards need literacy, dry hands and downtime she doesn't have. Chatbots only talk. Wet hands, continuous customers, vernacular-only — the interface must be speech.
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]: ₹3,500 / day
+        - generic [ref=e87]: Avg. working capital
+      - generic [ref=e88]: ×
+      - generic [ref=e89]:
+        - generic [ref=e90]: ~30%
+        - generic [ref=e91]: Unsold at close
+      - generic [ref=e92]: −
+      - generic [ref=e93]:
+        - generic [ref=e94]: evening salvage
+        - generic [ref=e95]: Distress discounting
+      - generic [ref=e96]: =
+      - generic [ref=e97]:
+        - generic [ref=e98]: ₹400 / day
+        - generic [ref=e99]: Net loss · ≈₹12,000/mo
+      - generic [ref=e100]: Up to 30% of household take-home erased · illustrative model, spoilage band 25–35%
+    - generic [ref=e101]:
+      - generic [ref=e102]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e103]: 12,000+ vegetable vendors in Bengaluru (working est.) · 60 lakh+ street vendors in India (PM SVANidhi)
+  - generic [ref=e104]:
+    - generic [ref=e105]:
+      - generic [ref=e106]:
+        - generic [ref=e107]: "3"
+        - text: Round 1
+      - generic [ref=e108]: Proposed Solution
+    - heading "A restocking loop that speaks, acts & remembers" [level=2] [ref=e109]
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - generic [ref=e112]:
+          - generic [ref=e113]: 1 · OBSERVE
+          - heading "👁️" [level=4] [ref=e114]
+          - paragraph [ref=e115]: Watches her world — hourly UPI sales velocity (Paytm signals, with consent), IMD rain probability, festival calendar, mandi rates, and perishable decay tables per commodity.
+        - generic [ref=e116]:
+          - generic [ref=e117]: 2 · PREDICT
+          - heading "🔮" [level=4] [ref=e118]
+          - paragraph [ref=e119]: "Forecasts spoilage & demand in her words: \"Rain at 3 PM — coriander shelf-life drops to 4 hours; your rainy-day coriander sales fall 40%.\""
+        - generic [ref=e120]:
+          - generic [ref=e121]: 3 · ACT
+          - heading "⚡" [level=4] [ref=e122]
+          - paragraph [ref=e123]: Recalculates and dispatches — resizes her order (10 → 6 bundles), confirms with her by voice, sends the revised buy-order to her mandi wholesaler on WhatsApp.
+        - generic [ref=e124]:
+          - generic [ref=e125]: 4 · LEARN
+          - heading "🧠" [level=4] [ref=e126]
+          - paragraph [ref=e127]: Remembers her business — which recalcs worked, which didn't, and why. Next week's order starts from this week's evidence, not zero.
+      - generic [ref=e128]:
+        - generic [ref=e129]:
+          - heading "No new app. No login. No literacy barrier." [level=4] [ref=e130]
+          - paragraph [ref=e131]: The interface is voice on WhatsApp — plus the morning briefing played on her Paytm Soundbox. The Soundbox already sits on her cart, already speaks her language. We upgrade it from payment confirmation to operational assistant.
+        - generic [ref=e132]:
+          - heading "Not another chatbot" [level=4] [ref=e133]
+          - paragraph [ref=e134]: Chatbots advise ("stock less"). HarvestWise finishes the job — it recalculates the order and dispatches it to the wholesaler, with a human voice-approval gate before anything that touches money.
+    - generic [ref=e135]:
+      - generic [ref=e136]: "One loop, every morning: Observe → Predict → Act → Learn."
+      - generic [ref=e137]: Spoilage prevented before it's bought, orders dispatched before the mandi gate, outcomes measured the same evening — compounding daily into her take-home and Paytm's GMV.
+    - generic [ref=e138]:
+      - generic [ref=e139]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e140]: 4 · Solution
+  - generic [ref=e141]:
+    - generic [ref=e142]:
+      - generic [ref=e143]:
+        - generic [ref=e144]: 3+
+        - text: Round 1
+      - generic [ref=e145]: Proposed Solution · Experience & Demo Script
+    - heading "A day with HarvestWise — in Kannada" [level=2] [ref=e146]
+    - paragraph [ref=e147]: "This is also our finale demo script: one phone, one voice note, one recalculated order, one remembered lesson."
+    - generic [ref=e148]:
+      - generic [ref=e149]:
+        - generic [ref=e150]: 6:30
+        - generic [ref=e151]: AM · Briefing
+        - generic [ref=e152]:
+          - generic [ref=e153]: "Namaskara Lakshmi! Today: 80% chance of rain at 3 PM. Order fewer tomatoes; leafy greens will sell out by evening. Best mandi rate: ₹18/kg at Kalasipalya."
+          - generic [ref=e154]: Auto-sent by the 6:30 AM n8n workflow — voice on WhatsApp and played on her Soundbox. 30 seconds, zero taps.
+      - generic [ref=e155]:
+        - generic [ref=e156]: 9:14
+        - generic [ref=e157]: AM · She orders
+        - generic [ref=e158]:
+          - generic [ref=e159]: ಟೊಮ್ಯಾಟೊ 3 ಬಾಕ್ಸ್, ಕೊತ್ತಂಬರಿ 10 ಕಟ್ಟು. ("3 crates of tomatoes, 10 bundles of coriander.")
+          - generic [ref=e160]: "Order noted. One flag: rain at 3 PM — coriander lasts only 4 hours in humidity, and your rainy-day coriander sales drop ~40%."
+          - generic [ref=e161]: Sarvam ASR → intent + entities → Cognee raises the spoilage flag against her history.
+      - generic [ref=e162]:
+        - generic [ref=e163]: 11:02
+        - generic [ref=e164]: AM · It recalculates
+        - generic [ref=e165]:
+          - generic [ref=e166]: "Revised: 6 bundles of coriander (not 10), 3 crates tomatoes. Wholesaler Ravi anna — ₹546. Approve?"
+          - generic [ref=e167]: ಹೌದು, ಕಳುಹಿಸು. ("Yes, send it.")
+          - generic [ref=e168]: "Dispatched: buy-order sent to the wholesaler, stock sheet updated — n8n gate: nothing moves without her \"yes\"."
+      - generic [ref=e169]:
+        - generic [ref=e170]: 8:30
+        - generic [ref=e171]: PM · It learns
+        - generic [ref=e172]:
+          - generic [ref=e173]: "Today: sold out by 7:15 PM, zero coriander waste. You kept ₹1,940 you'd have discounted away. This week: +₹4,100 vs last."
+          - generic [ref=e174]: "Logged to her Cognee memory graph: \"Rain recalc — worked, ₹1,940 kept.\" Next storm, she doesn't have to think."
+    - generic [ref=e175]:
+      - generic [ref=e176]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e177]: 5 · Experience
+  - generic [ref=e178]:
+    - generic [ref=e179]:
+      - generic [ref=e180]:
+        - generic [ref=e181]: "4"
+        - text: Round 1
+      - generic [ref=e182]: Technology / Tech Stack
+    - heading "Built on the organizers' own stack — one job each" [level=2] [ref=e183]
+    - generic [ref=e184]:
+      - generic [ref=e185]:
+        - generic [ref=e186]:
+          - generic [ref=e187]: Experience
+          - generic [ref=e188]: Where the merchant lives
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - text: WhatsApp Business API
+            - generic [ref=e191]: voice notes, in & out
+          - generic [ref=e192]:
+            - text: Paytm Soundbox
+            - generic [ref=e193]: morning audio briefing
+          - generic [ref=e194]:
+            - text: Business with Paytm
+            - generic [ref=e195]: optional dashboard view
+          - generic [ref=e196]: No new app, no login, no typing. Voice is the entire UI; the Soundbox is the loudspeaker.
+      - generic [ref=e197]:
+        - generic [ref=e198]:
+          - generic [ref=e199]: Intelligence
+          - generic [ref=e200]: Sarvam AI · Indic speech layer
+        - generic [ref=e201]:
+          - generic [ref=e202]:
+            - text: Sarvam Speech-to-Text
+            - generic [ref=e203]: ASR · 12 Indic languages
+          - generic [ref=e204]:
+            - text: Sarvam LLM
+            - generic [ref=e205]: intent + entities + reasoning
+          - generic [ref=e206]:
+            - text: Sarvam Text-to-Speech
+            - generic [ref=e207]: natural voice · 11 languages
+          - generic [ref=e208]: Understands Kannada/Tamil/Hindi natively — a low-literacy interface, not an English product with translation bolted on.
+      - generic [ref=e209]:
+        - generic [ref=e210]:
+          - generic [ref=e211]: Decision Core
+          - generic [ref=e212]: Cognee · causal knowledge graphs
+        - generic [ref=e213]:
+          - generic [ref=e214]:
+            - text: Merchant memory graph
+            - generic [ref=e215]: her history · what worked
+          - generic [ref=e216]:
+            - text: Commodity decay tables
+            - generic [ref=e217]: shelf-life × humidity × rain
+          - generic [ref=e218]:
+            - text: Cold-start patterns
+            - generic [ref=e219]: anonymized cross-merchant
+          - generic [ref=e220]: Maps shelf-life vs. rain vs. her actual UPI velocity — the causal layer that turns "advice" into a defensible recalculation.
+      - generic [ref=e221]:
+        - generic [ref=e222]:
+          - generic [ref=e223]: Orchestration
+          - generic [ref=e224]: n8n · event-driven actions
+        - generic [ref=e225]:
+          - generic [ref=e226]:
+            - text: n8n 6:30 AM workflow
+            - generic [ref=e227]: briefing · WhatsApp + Soundbox
+          - generic [ref=e228]:
+            - text: n8n order dispatcher
+            - generic [ref=e229]: revised buy-order → wholesaler
+          - generic [ref=e230]:
+            - text: n8n approval gates
+            - generic [ref=e231]: no money action without "yes"
+          - generic [ref=e232]: Event-driven API orchestration to mandi wholesalers; escalation and fallback branches built in.
+      - generic [ref=e233]:
+        - generic [ref=e234]:
+          - generic [ref=e235]: Data
+          - generic [ref=e236]: Consent-first signals
+        - generic [ref=e237]:
+          - generic [ref=e238]:
+            - text: Paytm merchant signals
+            - generic [ref=e239]: hourly UPI velocity · consent
+          - generic [ref=e240]:
+            - text: IMD weather API
+            - generic [ref=e241]: afternoon rain probability
+          - generic [ref=e242]:
+            - text: Mandi rate feeds
+            - generic [ref=e243]: APMC daily prices
+          - generic [ref=e244]: MVP uses synthetic settlement data in sandbox; production is consent-first inside Paytm's rails — raw data never leaves.
+    - generic [ref=e245]:
+      - generic [ref=e246]: ⚑ Guardrails are the product
+      - generic [ref=e247]: DPDP-aligned · federated learning (patterns shared, raw data never) · human approval on every money action · every recalc explained & undoable · full audit trail
+    - generic [ref=e248]:
+      - generic [ref=e249]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e250]: 6 · Architecture
+  - generic [ref=e251]:
+    - generic [ref=e252]:
+      - generic [ref=e253]:
+        - generic [ref=e254]: "5"
+        - text: Round 1
+      - generic [ref=e255]: Unique Selling Proposition
+    - heading "Advice is cheap. Closed loops are rare." [level=2] [ref=e256]
+    - paragraph [ref=e257]: Every alternative stops at a screen or a sentence. HarvestWise is the only one that speaks her language, recalculates her order, dispatches it, and remembers her business.
+    - table [ref=e258]:
+      - rowgroup [ref=e259]:
+        - row [ref=e260]:
+          - columnheader "Evaluation" [ref=e261]
+          - columnheader "Traditional merchant tools" [ref=e262]
+          - columnheader "Generic AI chatbots" [ref=e263]
+          - columnheader "HarvestWise" [ref=e264]
+      - rowgroup [ref=e265]:
+        - row [ref=e266]:
+          - rowheader "Input modality" [ref=e267]
+          - cell "English forms & dashboards — needs literacy, dry hands, downtime" [ref=e268]
+          - cell "Text-only chat — assumes she can type" [ref=e269]
+          - cell "Zero-touch Indic voice notes on WhatsApp (Sarvam) — she talks; that's the whole UI" [ref=e270]
+        - row [ref=e271]:
+          - rowheader "Decision intelligence" [ref=e272]
+          - cell "Static inventory tallying — backwards-looking" [ref=e273]
+          - cell "Generic public advice — no context, no memory" [ref=e274]
+          - 'cell "Causal knowledge graph: shelf-life × rain × her hourly UPI velocity (Cognee)" [ref=e275]'
+        - row [ref=e276]:
+          - rowheader "Workflow completion" [ref=e277]
+          - cell "Manual execution — she still does the work" [ref=e278]
+          - cell "Advises only — \"stock less\", then stops" [ref=e279]
+          - 'cell "Closed-loop procurement: recalculated buy-order dispatched to her mandi wholesaler (n8n)" [ref=e280]'
+        - row [ref=e281]:
+          - rowheader "Hardware tie-in" [ref=e282]
+          - cell "None" [ref=e283]
+          - cell "None" [ref=e284]
+          - cell "Morning audio briefing on Paytm Soundbox — payment speaker upgraded to operational assistant" [ref=e285]
+    - generic [ref=e286]:
+      - generic [ref=e287]: MOAT
+      - text: Per-merchant memory graph (Cognee) × vernacular closed loop (Sarvam + n8n) × Soundbox/Paytm-native distribution — a compounding data advantage every single day.
+    - generic [ref=e288]:
+      - generic [ref=e289]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e290]: 7 · USP
+  - generic [ref=e291]:
+    - generic [ref=e292]:
+      - generic [ref=e293]:
+        - generic [ref=e294]: "6"
+        - text: Round 1
+      - generic [ref=e295]: Impact & Benefits
+    - heading "Waste is her biggest expense. We give 60% of it back." [level=2] [ref=e296]
+    - generic [ref=e297]:
+      - generic [ref=e298]:
+        - heading "Lakshmi's monthly take-home Illustrative model" [level=4] [ref=e299]:
+          - text: Lakshmi's monthly take-home
+          - generic [ref=e300]: Illustrative model
+        - generic [ref=e301]:
+          - generic [ref=e302]:
+            - generic [ref=e303]: ₹18,200
+            - generic [ref=e305]: Base take-home(~20% margin)
+          - generic [ref=e306]:
+            - generic [ref=e307]: +₹7,200
+            - generic [ref=e309]: Spoilage preserved(60% reduction)
+          - generic [ref=e310]:
+            - generic [ref=e311]: ₹25,400
+            - generic [ref=e313]: New take-home+40%
+        - generic [ref=e314]: Assumes ₹3,500 avg. daily working capital × 26 days, ~20% gross margin, ₹400/day net spoilage loss after evening salvage. The 60% spoilage-reduction target (₹240/day ≈ ₹7,200/mo) is the pilot metric we commit to validating — not a claim.
+      - generic [ref=e315]:
+        - heading "What Paytm wins" [level=4] [ref=e316]
+        - generic [ref=e317]:
+          - generic [ref=e318]: 🔊
+          - generic [ref=e319]: "Soundbox upgraded: from passive payment-confirmation speaker to active operational assistant — a deeper, stickier device relationship."
+        - generic [ref=e320]:
+          - generic [ref=e321]: 📈
+          - generic [ref=e322]: "GMV up: better-stocked merchants capture demand they currently miss — target +8% GMV per merchant."
+        - generic [ref=e323]:
+          - generic [ref=e324]: 🏦
+          - generic [ref=e325]: "Underwriting data moat: proprietary inventory & procurement telemetry derisks Paytm Merchant Loans — replacing \"meter baddi\" with formal credit."
+        - generic [ref=e326]:
+          - generic [ref=e327]: ❤️
+          - generic [ref=e328]: "Mission delivered: financial inclusion that shows up as a healthier family P&L — the story of Build for India."
+        - generic [ref=e329]:
+          - generic [ref=e330]:
+            - generic [ref=e331]: ₹7,200
+            - generic [ref=e332]: Preserved / vendor / mo*
+          - generic [ref=e333]:
+            - generic [ref=e334]: ₹105 Cr+
+            - generic [ref=e335]: Working capital / yr · 12k vendors*
+          - generic [ref=e336]:
+            - generic [ref=e337]: ₹175 Cr+
+            - generic [ref=e338]: Current annual spoilage loss (city-wide est.)
+        - generic [ref=e339]: "*12,000 vendors × ₹240/day × 365. Impact framed as money preserved — not vanity metrics."
+    - generic [ref=e340]:
+      - generic [ref=e341]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e342]: 8 · Impact
+  - generic [ref=e343]:
+    - generic [ref=e344]:
+      - generic [ref=e345]:
+        - generic [ref=e346]: "7"
+        - text: Round 1
+      - generic [ref=e347]: Business Model
+    - heading "Billed where she already pays. Free where she starts." [level=2] [ref=e348]
+    - generic [ref=e349]:
+      - generic [ref=e350]:
+        - generic [ref=e351]: Seed
+        - generic [ref=e352]: ₹0 / forever
+        - list [ref=e353]:
+          - listitem [ref=e354]: Daily demand alerts — weather + spoilage risk, one voice note + Soundbox briefing
+          - listitem [ref=e355]: Yesterday's sales recap
+          - listitem [ref=e356]: Builds the daily habit — zero CAC via Paytm for Business & Soundbox base
+      - generic [ref=e357]:
+        - generic [ref=e358]: Settlement-billed
+        - generic [ref=e359]: Pro
+        - generic [ref=e360]: ₹149 / month
+        - list [ref=e361]:
+          - listitem [ref=e362]: "Autonomous restocking: order recalculation + dispatch to her wholesaler"
+          - listitem [ref=e363]: Price-drop supplier alerts · end-of-day P&L voice audit
+          - listitem [ref=e364]: Paid via micro-deductions from daily Paytm settlements — no invoice, no friction, always cash-positive for her
+      - generic [ref=e365]:
+        - generic [ref=e366]: Platform Revenues
+        - generic [ref=e367]: Take-rate on value created
+        - list [ref=e368]:
+          - listitem [ref=e369]: "Supplier marketplace: % on executed mandi orders"
+          - listitem [ref=e370]: "Credit distribution: procurement telemetry derisks Paytm Merchant Loans"
+          - listitem [ref=e371]: Anonymized demand curves (DPDP-compliant) for supply-chain aggregators & APMC transport optimization
+    - generic [ref=e372]:
+      - generic [ref=e373]:
+        - generic [ref=e374]: Why merchants buy
+        - generic [ref=e375]: ₹149/mo vs ₹7,200/mo preserved — pays for itself in one saved evening of stock.
+      - generic [ref=e376]:
+        - generic [ref=e377]: Why it compounds
+        - generic [ref=e378]: Every day improves her memory graph — advice quality compounds, churn falls.
+      - generic [ref=e379]:
+        - generic [ref=e380]: Unit economics
+        - generic [ref=e381]: Zero-CAC Paytm-native distribution × 80%+ SaaS margin × data flywheel into lending.
+      - generic [ref=e382]:
+        - generic [ref=e383]: Why Paytm wins
+        - generic [ref=e384]: "The deepest merchant lock-in since the Soundbox: the device confirmed payments; we grow them."
+    - generic [ref=e385]:
+      - generic [ref=e386]: The wedge → the platform
+      - generic [ref=e387]: "Start: perishable carts & stalls (highest pain, clearest signal) → kirana fresh categories → 30M+ merchants as the daily restocking layer of the Paytm ecosystem."
+    - generic [ref=e388]:
+      - generic [ref=e389]: "HarvestWise · Track 1: Merchant Growth AI"
+      - generic [ref=e390]: 9 · Business Model
+  - generic [ref=e391]:
+    - generic [ref=e392]:
+      - generic [ref=e393]:
+        - generic [ref=e394]: →
+        - text: Next
+      - generic [ref=e395]: Roadmap · Team · Ask
+    - heading "From this deck to a pilot" [level=2] [ref=e396]
+    - generic [ref=e397]:
+      - generic [ref=e398]:
+        - generic [ref=e399]: Now — Finale
+        - generic [ref=e400]: MVP on partner stack
+        - generic [ref=e401]: Synthetic 90-day sales data; 3 n8n workflows (briefing, order recalc + dispatch, day-wrap learning); Sarvam voice loop; Cognee memory. Live demo, one phone.
+      - generic [ref=e402]:
+        - generic [ref=e403]: Months 1–3
+        - generic [ref=e404]: 500-merchant pilot
+        - generic [ref=e405]: KR Market, Russell Market & Madivala with vendor associations + Paytm's merchant network. Validate the 60% spoilage-reduction metric.
+      - generic [ref=e406]:
+        - generic [ref=e407]: Months 4–6
+        - generic [ref=e408]: Paytm-native integration
+        - generic [ref=e409]: API partnership with Paytm for Business; Soundbox briefing rail; mandi logistics channels wired into n8n dispatch.
+      - generic [ref=e410]:
+        - generic [ref=e411]: Beyond
+        - generic [ref=e412]: The restocking layer
+        - generic [ref=e413]: Perishables → kirana fresh → all categories. Procurement telemetry → merchant credit. Every merchant, a copilot.
+    - generic [ref=e414]: "\"Every morning at 4:30, India's merchants guess.From tomorrow, they guess with a copilot.\""
+    - generic [ref=e416]:
+      - generic [ref=e417]:
+        - generic [ref=e418]: Team
+        - generic [ref=e419]: "[Team Name] — [Member 1] · [Member 2] · [Member 3]"
+      - generic [ref=e420]:
+        - generic [ref=e421]: Built with
+        - generic [ref=e422]: Sarvam AI · n8n · Cognee
+      - generic [ref=e423]:
+        - generic [ref=e424]: Ask
+        - generic [ref=e425]: A 500-merchant pilot with Paytm's network
+      - generic [ref=e426]: Solve with AI. Build for India.

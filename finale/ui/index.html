@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HarvestWise — Live Demo</title>
+<style>
+:root{--navy:#002E6E;--blue:#00BAF2;--green:#10B981;--amber:#F59E0B;--red:#EF4444;--bg:#F8FAFC;--card:#fff;--border:#E2E8F0}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:#1E293B}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:18px}header span{font-size:12px;opacity:.8}
+.wrap{max-width:960px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+@media(max-width:700px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card h2{margin:0 0 10px;font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:14px}
+.kv:last-child{border:0}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#E0F2FE;color:var(--navy)}
+.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:#fff;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-rec{background:var(--red)}
+.btn-rec.recording{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--border)}
+.log{font-family:ui-monospace,monospace;font-size:12px;background:#0F172A;color:#E2E8F0;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:220px;overflow:auto}
+.graph{display:flex;gap:8px;flex-wrap:wrap}
+.node{padding:6px 10px;border-radius:999px;background:#EFF6FF;border:1px solid #BFDBFE;font-size:12px}
+.edge{color:#64748B;font-size:12px;align-self:center}
+.flow{display:flex;gap:8px;align-items:center;font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;background:#CBD5E1}
+.dot.ok{background:var(--green)}.dot.run{background:var(--amber)}
+.full{grid-column:1 / -1}
+small{color:#64748B}
+.item{border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px;font-size:14px}
+.item b{color:var(--navy)}
+.tn{font-size:16px}
+input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;font-size:14px;width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌾 HarvestWise <small style="color:#fff;opacity:.7">— voice-first autonomous restocking</small></h1>
+  <span>Lakshmi · Kalasipalya · <span id="apiStatus" class="badge">API checking…</span></span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Merchant — Lakshmi (representative persona)</h2>
+    <div class="kv"><span>Stock tomato</span><b>12 kg on hand</b></div>
+    <div class="kv"><span>Stock coriander</span><b>6 bunches on hand</b></div>
+    <div class="kv"><span>Velocity (90d)</span><b>14 kg/day · <span style="color:var(--green)">+18%</span></b></div>
+    <div class="kv"><span>Weather (IMD) tomorrow</span><b id="wLine">78% rain · Basavanagudi</b></div>
+    <div class="kv"><span>Decay</span><b>tomato 2d · coriander 1d · 85% humidity</b></div>
+    <div class="kv"><span>Supplier</span><b>Basavanagudi Mandi</b></div>
+    <small>Paytm-transaction-shaped seeded demo data — never live Paytm access (labeled)</small>
+  </div>
+
+  <div class="card">
+    <h2>Live Demo — one voice note → executed order</h2>
+    <div class="flow" id="flow">
+      <span class="dot" id="d1"></span> STT
+      <span class="dot" id="d1b"></span> Reco
+      <span class="dot" id="d2"></span> Approve
+      <span class="dot" id="d3"></span> Dispatch
+      <span class="dot" id="d4"></span> Memory
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-rec" id="btnMic" onclick="toggleMic()">🎙 Record command</button>
+      <button class="btn btn-ghost" onclick="playCached()" title="plays assets/command_ta.wav if present">▶ Cached audio</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input class="txt" id="typedCmd" placeholder='typed fallback: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி"'>
+      <button class="btn btn-ghost" onclick="runPipeline(document.getElementById('typedCmd').value)">Run</button>
+    </div>
+    <div id="transcriptLine" style="margin-top:8px;font-size:13px;color:#334155"></div>
+    <div id="itemsBox"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-rec" id="btnMicApprove" onclick="toggleMic('approve')" disabled>🎙 Approve — say “சரி”</button>
+      <button class="btn btn-ghost" id="btnApproveTyped" onclick="approveVoice('சரி')" disabled>✅ சரி (typed fallback)</button>
+      <button class="btn" id="btnDispatch" onclick="dispatchAll()" disabled>3. Dispatch via n8n</button>
+    </div>
+    <audio id="player" controls style="width:100%;display:none;margin-top:8px"></audio>
+    <audio id="cmdPlayer" style="display:none"></audio>
+  </div>
+
+  <div class="card">
+    <h2>Why this order? — Cognee causal memory</h2>
+    <div class="graph" id="graph">
+      <span class="node">Lakshmi → sells → Tomato · Coriander</span><span class="edge">→</span>
+      <span class="node">velocity +18%</span><span class="edge">→</span>
+      <span class="node">stock 12kg · 6 bunches</span><span class="edge">→</span>
+      <span class="node">rain 78%</span><span class="edge">→</span>
+      <span class="node" style="background:var(--green);color:#fff" id="graphOut">20kg + 6 bunches</span>
+    </div>
+    <button class="btn btn-ghost" style="margin-top:10px" onclick="doRecall()">Recall from Cognee</button>
+    <div id="recallBox" class="log" style="margin-top:10px;display:none"></div>
+    <small>LLM explains, engine decides — every number from an Observation</small>
+  </div>
+
+  <div class="card">
+    <h2>n8n — Execution</h2>
+    <div id="n8nBox" class="log">Waiting for dispatch… (N8N_WEBHOOK_URL + Twilio configured in .env)</div>
+    <small>Human-approval gate → wholesaler WhatsApp → inventory update → status</small>
+  </div>
+
+  <div class="card full">
+    <h2>System log</h2>
+    <div id="syslog" class="log">Booting…</div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let lastBasket=null, tokens={}, mediaRecorder=null, chunks=[], micMode='command';
+
+function log(m){ const el=document.getElementById('syslog'); el.textContent += '\n' + m; el.scrollTop=el.scrollHeight; }
+function dot(id,cls){ document.getElementById(id).className='dot'+(cls?' '+cls:''); }
+async function check(){ try{ const r=await fetch(API+'/health'); const j=await r.json(); document.getElementById('apiStatus').textContent='API ok'+(j.sarvam_key?'':' (no key → typed fallback)'); document.getElementById('apiStatus').style.background='#DCFCE7'; log('API health ok · sarvam key: '+j.sarvam_key);}catch(e){ document.getElementById('apiStatus').textContent='API offline — run uvicorn'; document.getElementById('apiStatus').style.background='#FEE2E2'; log('API offline: '+e)}}
+check();
+
+/* ── Mic capture: MediaRecorder → webm/opus → /stt ── */
+async function toggleMic(mode){
+  micMode = mode || 'command';
+  if(mediaRecorder && mediaRecorder.state==='recording'){ mediaRecorder.stop(); return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder = new MediaRecorder(stream, {mimeType:'audio/webm;codecs=opus'});
+    chunks=[];
+    mediaRecorder.ondataavailable = e=>chunks.push(e.data);
+    mediaRecorder.onstop = async ()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      document.getElementById('btnMic').classList.remove('recording');
+      document.getElementById('btnMic').textContent='🎙 Record command';
+      const blob = new Blob(chunks, {type:'audio/webm'});
+      log('Mic: '+(blob.size/1024).toFixed(0)+' KB webm captured');
+      if(micMode==='approve'){ await sttApprove(blob); } else { await sttCommand(blob); }
+    };
+    mediaRecorder.start();
+    const b = micMode==='approve' ? document.getElementById('btnMicApprove') : document.getElementById('btnMic');
+    b.classList.add('recording'); b.textContent='⏹ Stop';
+    log('Recording… speak now');
+  }catch(e){ log('Mic error: '+e.message+' — use typed fallback'); }
+}
+async function sttCommand(blob){
+  dot('d1','run');
+  const fd=new FormData(); fd.append('file', blob, 'audio.webm');
+  try{
+    const r=await fetch(API+'/stt', {method:'POST', body:fd});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.detail||r.status); }
+    const j=await r.json();
+    document.getElementById('transcriptLine').innerHTML='<b>Transcript:</b> '+j.transcript;
+    log('STT: '+j.transcript);
+    await runPipeline(j.transcript);
+  }catch(e){ dot('d1'); log('STT failed ('+e.message+') — typed-transcript fallback (labeled)'); }
+}
+async function sttApprove(blob){
+  const fd=new FormData(); fd.append('file', blob, 'audio.webm');
+  try{
+    const r=await fetch(API+'/stt', {method:'POST', body:fd});
+    const j=await r.json();
+    log('STT approve heard: '+j.transcript);
+    await approveVoice(j.transcript);
+  }catch(e){ log('STT approve failed — use typed fallback'); }
+}
+function playCached(){
+  const p=document.getElementById('cmdPlayer');
+  p.src='assets/command_ta.wav';
+  p.play().catch(()=>log('No assets/command_ta.wav — crew records the Tamil command into ui/assets/'));
+  log('Playing cached demo audio (backup path)');
+}
+
+/* ── Pipeline: transcript → intent → basket rec ── */
+async function runPipeline(transcript){
+  transcript=(transcript||'').trim();
+  if(!transcript){ log('Empty transcript'); return; }
+  dot('d1','ok'); dot('d1b','run');
+  log('POST /intent');
+  const ir=await fetch(API+'/intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript})});
+  const intent=await ir.json();
+  log('Intent: '+JSON.stringify(intent));
+  if(intent.intent!=='create_restock_order'){
+    dot('d1b');
+    document.getElementById('transcriptLine').innerHTML='<b>Heard:</b> “'+transcript+'” → <i>'+(intent.intent==='decline'?'declined — nothing ordered':intent.intent)+'</i>';
+    return;
+  }
+  if(intent.clarification_needed) log('Note: some quantities not stated — engine fills from deterministic formula');
+  const br=await fetch(API+'/rec/basket',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({products:intent.products})});
+  lastBasket=await br.json();
+  renderBasket();
+  dot('d1b','ok');
+  document.getElementById('btnMicApprove').disabled=false;
+  document.getElementById('btnApproveTyped').disabled=false;
+  await speakAsk();
+}
+function unitTn(u){ return u==='kg'?'கிலோ':'கொத்து'; }
+function renderBasket(){
+  const box=document.getElementById('itemsBox'); box.innerHTML='';
+  let summary=[];
+  lastBasket.items.forEach(it=>{
+    const d=document.createElement('div'); d.className='item';
+    d.innerHTML='<b class="tn">'+it.product+' · <span>'+ (it.name_tn||'') +'</span></b> — she asked '+(it.requested||'—')+' → engine: <b style="color:var(--green)">'+it.recommended_qty+' '+it.unit+'</b> · ₹'+it.total_inr
+      +'<br><small>'+it.factors.map(f=>f.source+': '+f.fact).join(' · ')+'</small>';
+    box.appendChild(d);
+    summary.push(it.recommended_qty+' '+unitTn(it.unit)+' '+(it.name_tn||it.product));
+  });
+  const t=document.createElement('div'); t.className='item'; t.style.background='#ECFDF5';
+  t.innerHTML='<b>Basket total: ₹'+lastBasket.basket_total_inr+'</b>';
+  box.appendChild(t);
+  document.getElementById('graphOut').textContent=lastBasket.items.map(i=>i.recommended_qty+' '+i.unit).join(' + ')+' dispatched';
+  log('Basket: '+lastBasket.items.map(i=>i.product+' '+i.recommended_qty+i.unit).join(', ')+' = ₹'+lastBasket.basket_total_inr);
+}
+async function speakAsk(){
+  const ask='நாளை மழை '+Math.round((lastBasket.weather.rain_prob||0.78)*100)+' சதவீதம் இருக்கும். நாளை '+lastBasket.items.map(i=>i.recommended_qty+' '+unitTn(i.unit)+' '+(i.name_tn||'')).join(', ')+' வேண்டுமா? வேண்டும் என்றால் “சரி” என்று சொல்லுங்கள்.';
+  try{
+    const t=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:ask,lang:'ta-IN'})});
+    if(t.ok){ const b=await t.blob(); const u=URL.createObjectURL(b); const p=document.getElementById('player'); p.src=u; p.style.display='block'; p.play(); }
+    else { const j=await t.json().catch(()=>({})); log('TTS skipped: '+(j.detail||t.status)); }
+  }catch(e){ log('TTS fallback: '+e.message); }
+}
+
+/* ── Approval gate ── */
+async function approveVoice(transcript){
+  dot('d2','run');
+  const items=lastBasket.items.map(i=>({product:i.product, qty:i.recommended_qty}));
+  const r=await fetch(API+'/voice/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript, items, basket_total_inr:lastBasket.basket_total_inr})});
+  const j=await r.json();
+  log('Approve ('+transcript+'): '+JSON.stringify(j));
+  if(j.status==='approved'){ j.items.forEach(it=>tokens[it.product]=it.approval_token); dot('d2','ok'); document.getElementById('btnDispatch').disabled=false; }
+  else if(j.status==='declined'||j.status==='needs_confirmation'){ dot('d2'); log('Not approved — no order moves (gate held)'); }
+  else { dot('d2'); alert('Approve failed: '+j.reason); }
+}
+
+/* ── Dispatch (single-use tokens; duplicates refused server-side) ── */
+async function dispatchAll(){
+  dot('d3','run');
+  const box=document.getElementById('n8nBox'); box.textContent='';
+  for(const it of lastBasket.items){
+    const token=tokens[it.product];
+    if(!token){ log('No token for '+it.product); continue; }
+    const r=await fetch(API+'/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_token:token, total_inr:it.total_inr})});
+    const j=await r.json();
+    box.textContent+=JSON.stringify(j,null,1)+'\n';
+    if(j.status==='dispatched'){ log('Dispatched '+it.product+' → n8n '+(j.record.n8n||'not configured')+', twilio '+(j.record.twilio_status||'n/a')); }
+    else { log('Dispatch '+it.product+': '+j.status+' — '+(j.reason||'')); }
+  }
+  dot('d3','ok'); dot('d4','ok');
+  log('Second click would be refused: idempotency (FAILPATH #4)');
+}
+
+/* ── Cognee recall via API (key stays server-side) ── */
+async function doRecall(){
+  log('Cognee recall: Why this order?');
+  try{
+    const r=await fetch(API+'/cognee/recall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'Why 20 kg tomato and 6 bunches coriander?', datasets:['harvestwise']})});
+    const j=await r.json();
+    document.getElementById('recallBox').style.display='block';
+    document.getElementById('recallBox').textContent=JSON.stringify(j,null,2).slice(0,900);
+  }catch(e){ log('Recall failed: '+e.message); }
+}
+</script>
+</body>
+</html>
