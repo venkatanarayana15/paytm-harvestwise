@@ -1,26 +1,18 @@
-# secrets — never commit
 .env
-finale/.env
-*.env.bak
-
-# python
-__pycache__/
+__pycache__
 *.pyc
-.venv/
-
-# node / n8n lab
-node_modules/
-qa-runs/n8n-lab/
-
-# demo artifacts (regenerable)
-finale/tts_*.wav
-finale/test_tts2.wav
-finale/dispatch_record.json
-finale/dispatched_tokens.txt
-finale/data/seed.json
-finale/cognee/memory.json
-
-# editor / logs
-.opencode/session/
-*.log
-
+*.egg-info
+node_modules
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+.DS_Store?
+*~
+.DS_Store
+Thumbs.db
+.DS_Store
+*.bak
+*.orig
+*.rej
