@@ -8,21 +8,36 @@ MEM_PATH = "cognee/memory.json"
 def seed():
     memory = {
         "lakshmi": {
-            "sells": "tomato, coriander",
+            "sells": "tomato, coriander, onion, spinach",
             "recent_sales_velocity": "+18% vs last week (tomato 14kg/day avg)",
-            "current_stock": "12 kg tomato, 6 bunches coriander on hand",
-            "expected_rain": "78% tomorrow (IMD, Basavanagudi)",
-            "shelf_life": "tomato 2 days, coriander 1 day at 85% humidity",
-            "rain_sensitivity": "coriander rainy-day sales -40% (90d history); tomato holds",
-            "recommendation": "20 kg tomato (requested 3 crates) + 6 bunches coriander (10 asked, rain-adjusted) — basket ₹546",
+            "current_stock": "12 kg tomato, 6 bunches coriander, 15 kg onion, 4 bunches spinach on hand",
+            "expected_rain": "78% tomorrow (IMD, Basavanagudi — live via Open-Meteo)",
+            "shelf_life": "tomato 2 days, coriander 1 day, onion 5 days, spinach 1 day at 85% humidity",
+            "rain_sensitivity": "coriander -40% / spinach -50% / onion -9% rainy-day sales (90d history); tomato holds",
+            "recommendation": "20 kg tomato + 6 bunches coriander (10 asked, rain-adjusted) — basket ₹546",
             "cause_chain": [
-                "Lakshmi -> sells -> Tomato, Coriander",
+                "Lakshmi -> sells -> Tomato, Coriander, Onion, Spinach",
                 "Tomato -> velocity -> +18% (14kg/day)",
                 "Coriander -> rainy-day sales -> -40%",
-                "Stock -> 12kg tomato, 6 bunches coriander",
-                "Tomorrow -> rain -> 78%",
+                "Stock -> 12kg tomato, 6 bunches coriander, 15kg onion",
+                "Tomorrow -> rain -> 78% (live Open-Meteo)",
                 "Engine -> tomato 20kg x1.0, coriander 10x0.6=6 bunches",
                 "Basket -> 360 + 186 = Rs.546 -> approved & dispatched"
+            ],
+            "updated": datetime.datetime.now().isoformat()
+        },
+        "rahul": {
+            "sells": "tomato, potato",
+            "recent_sales_velocity": "tomato 12kg/day, potato 15kg/day avg",
+            "current_stock": "10 kg tomato, 20 kg potato on hand",
+            "expected_rain": "78% tomorrow (IMD, KR Market — live via Open-Meteo)",
+            "shelf_life": "tomato 2 days, potato 10 days",
+            "rain_sensitivity": "potato -5% rainy-day sales (history)",
+            "recommendation": "fresh merchant — cold-start via federated patterns",
+            "cause_chain": [
+                "Rahul -> sells -> Tomato, Potato",
+                "KR Market -> festival week -> demand up",
+                "Engine -> cold-start federated pattern from similar stalls"
             ],
             "updated": datetime.datetime.now().isoformat()
         }

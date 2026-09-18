@@ -56,12 +56,14 @@ check("STT no-file 422", httpx.post(f"{B}/stt", timeout=10).status_code == 422)
 
 print("== 6. multi-merchant support ==")
 try:
+    import sys
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     r = httpx.post(f"{B}/rec", json={"product": "onion", "requested_qty": 10}, timeout=10).json()
-    check("onion in lakshmi catalog", r.get("product") == "onion" and r.get("recommended_qty") <= 10, str(r))
+    check("onion in lakshmi catalog", r.get("product") == "onion" and r.get("recommended_qty") <= 10, str(r)[:120])
     r = httpx.post(f"{B}/rec", json={"product": "potato", "requested_qty": 10, "merchant_id": "rahul"}, timeout=10).json()
-    check("potato in rahul catalog", r.get("product") == "potato" and r.get("recommended_qty") <= 10, str(r))
+    check("potato in rahul catalog", r.get("product") == "potato" and r.get("recommended_qty") <= 10, str(r)[:120])
 except Exception as e:
-    check("multi-merchant catalog", False, str(e))
+    check("multi-merchant catalog", False, str(e)[:200])
 
 print("== 7. STT round-trip ==")
 try:

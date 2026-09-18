@@ -1,6 +1,9 @@
-# Ignore environment and local state files
+# Ignore environment and local state files — NEVER commit secrets (Sarvam/Cognee/Twilio leaked once, rotate if needed)
 .env
 .env.*
+finale/.env
+*.env.local
+*.env.*.local
 
 # Python
 __pycache__/
@@ -22,11 +25,17 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Local runtime files
-finale/memory.json
+# Local runtime files — keep repo reviewable (judges clone it)
+finale/cognee/memory.json
 finale/data/seed.json
 finale/dispatch_record.json
 finale/dispatched_tokens.txt
 finale/tts_*.wav
-playwright-mcp/
+finale/audio/*.wav
+__pycache__/
+*.pyc
+.playwright-mcp/
 qa-runs/n8n-lab/
+node_modules/
+.muse/
+.opencode/

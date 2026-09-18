@@ -74,19 +74,28 @@ CATALOG = {
 WEATHER = {"tomorrow": {"rain_prob": 0.78, "humidity": 85}}
 
 
+_weather_cache: dict = {}
+_weather_cache_at: float = 0
+
 def get_weather(city: str = "basavanagudi") -> dict:
-    """Fetch live weather (Open-Meteo) — falls back to seeded if unavailable."""
+    """Fetch live weather (Open-Meteo) — cached 10min, fast fallback to seeded (never blocks demo)."""
+    global _weather_cache, _weather_cache_at
+    import time
+    now = time.time()
+    if _weather_cache and now - _weather_cache_at < 600:
+        return _weather_cache
     try:
         import httpx
-        # Bangalore coords; change to city-specific if needed
         r = httpx.get(
             "https://api.open-meteo.com/v1/forecast",
             params={"latitude": 12.9716, "longitude": 77.5946, "daily": "precipitation_probability_max", "timezone": "Asia%2FCalcutta", "forecast_days": 1},
-            timeout=5, verify=False
+            timeout=2, verify=False
         )
         if r.status_code == 200:
             data = r.json()
-            return {"rain_prob": data["daily"]["precipitation_probability_max"][0] / 100, "humidity": 85}
+            _weather_cache = {"rain_prob": data["daily"]["precipitation_probability_max"][0] / 100, "humidity": 85}
+            _weather_cache_at = now
+            return _weather_cache
     except Exception as e:
         pass
     return WEATHER["tomorrow"]

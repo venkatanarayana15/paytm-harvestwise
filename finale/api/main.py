@@ -151,8 +151,8 @@ def get_recommendation(payload: dict):
         rec = recommendation(merchant_id, product, requested)
     except KeyError as e:
         raise HTTPException(400, f"Unknown product — catalog: {', '.join(CATALOG.get(merchant_id, []))}")
-    rain = WEATHER["tomorrow"]["rain_prob"]
-    rec["rain_prob"] = rain
+    from engine.restock import get_weather
+    rec["rain_prob"] = get_weather()["rain_prob"]
     return rec
 
 
@@ -169,8 +169,9 @@ def get_basket(payload: dict):
             raise HTTPException(400, f"Unknown product: {product}")
         items.append(rec)
         total += rec["total_inr"]
+    from engine.restock import get_weather
     return {"items": items, "basket_total_inr": total,
-            "weather": WEATHER["tomorrow"]}
+            "weather": get_weather()}
 
 
 class Order(BaseModel):
@@ -309,6 +310,18 @@ def get_memory():
             return json.load(f)
     except OSError:
         return {"lakshmi": {"note": "run python cognee/seed_memory.py first"}}
+
+
+@app.get("/soundbox/briefing")
+def soundbox_briefing():
+    """Morning briefing audio payload — Soundbox plays the same voice briefing (simulated)."""
+    from engine.restock import get_weather, CATALOG
+    w = get_weather()
+    rain = int(w["rain_prob"] * 100)
+    # seeded Paytm-shape: lakshmi's stock
+    s = CATALOG["lakshmi"]
+    text = f"Vanakkam Lakshmi! Naalai {rain} sathaveetham mazhai. Thakkali {s['tomato']['current_stock']} kilo ullathu, kothamalli {s['coriander']['current_stock']} kothu. Mandi vilai kilo {s['tomato']['price_per_unit']} rubai."
+    return {"text": text, "rain_prob": w["rain_prob"], "source": "HarvestWise Soundbox briefing (simulated — plays on Paytm Soundbox rail)", "plays_on": "Paytm Soundbox"}
 
 
 @app.post("/cognee/recall")

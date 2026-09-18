@@ -104,6 +104,28 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
     <small>Human-approval gate → wholesaler WhatsApp → inventory update → status</small>
   </div>
 
+  <div class="card">
+    <h2>Paytm Soundbox — Morning Briefing (simulated)</h2>
+    <div id="soundboxBox" class="log">Loading briefing…</div>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="playSoundbox()">▶ Play on Soundbox</button>
+    <audio id="soundboxPlayer" controls style="width:100%;display:none;margin-top:8px"></audio>
+    <small>Same briefing plays on the Soundbox she already owns — upgrade, not new device</small>
+  </div>
+
+  <div class="card full">
+    <h2>Pilot Telemetry — What Paytm Lending Sees</h2>
+    <div class="log" id="telemetryBox">{
+  "procurement_telemetry": {
+    "merchant": "lakshmi (representative persona)",
+    "orders_90d": 78, "on_time_dispatch_rate": "96%",
+    "spoilage_preserved_model": "₹7,200/mo (illustrative)",
+    "input_cost_volatility": "low (decay-aware ordering)"
+  },
+  "signal_for_underwriting": "causal, auditable restocking behavior — not just GMV"
+}</div>
+    <small>Lending today = GMV. Missing = procurement rhythm. HarvestWise produces it.</small>
+  </div>
+
   <div class="card full">
     <h2>System log</h2>
     <div id="syslog" class="log">Booting…</div>
@@ -248,6 +270,23 @@ async function dispatchAll(){
   log('Second click would be refused: idempotency (FAILPATH #4)');
 }
 
+/* ── Soundbox briefing — simulated rail ── */
+async function loadSoundbox(){
+  try{
+    const r=await fetch(API+'/soundbox/briefing'); const j=await r.json();
+    document.getElementById('soundboxBox').textContent=JSON.stringify(j,null,2);
+  }catch(e){ document.getElementById('soundboxBox').textContent='Soundbox briefing (offline): Vanakkam Lakshmi! Naalai 78% mazhai — demo fallback'; }
+}
+loadSoundbox();
+async function playSoundbox(){
+  try{
+    const b=await fetch(API+'/soundbox/briefing').then(r=>r.json());
+    const t=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:b.text,lang:'ta-IN'})});
+    if(t.ok){ const blob=await t.blob(); const url=URL.createObjectURL(blob); const p=document.getElementById('soundboxPlayer'); p.src=url; p.style.display='block'; p.play(); log('Soundbox: briefing playing (simulated rail)'); }
+    else { log('Soundbox TTS skipped — typed briefing shown above'); }
+  }catch(e){ log('Soundbox play failed: '+e.message); }
+}
+
 /* ── Cognee recall via API (key stays server-side) ── */
 async function doRecall(){
   log('Cognee recall: Why this order?');
@@ -255,8 +294,13 @@ async function doRecall(){
     const r=await fetch(API+'/cognee/recall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'Why 20 kg tomato and 6 bunches coriander?', datasets:['harvestwise']})});
     const j=await r.json();
     document.getElementById('recallBox').style.display='block';
-    document.getElementById('recallBox').textContent=JSON.stringify(j,null,2).slice(0,900);
-  }catch(e){ log('Recall failed: '+e.message); }
+    const txt = JSON.stringify(j,null,2);
+    if(j.error || txt.length < 80){
+      document.getElementById('recallBox').innerHTML = '<img src="../cognee/graph_fallback.svg" style="width:100%;background:#0F172A;border-radius:8px;padding:8px"><div style="margin-top:6px">'+txt.slice(0,700)+'</div>';
+    } else {
+      document.getElementById('recallBox').textContent=txt.slice(0,900);
+    }
+  }catch(e){ log('Recall failed: '+e.message); document.getElementById('recallBox').style.display='block'; document.getElementById('recallBox').innerHTML='<img src="../cognee/graph_fallback.svg" style="width:100%">'; }
 }
 </script>
 </body>
