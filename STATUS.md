@@ -1,6 +1,6 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-18
+Last updated: 2026-09-18 (UI rebuild + WhatsApp verified end-to-end)
 
 ## Phase
 Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
@@ -8,10 +8,9 @@ Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Ev
 
 ## Blockers (owner + status)
 1. Round-1 PDF upload confirmation — owner: team — CLOSED ✅ 2026-09-13
-2. **`TWILIO_WHATSAPP_TO` not set** — owner: team — OPEN
-   Without it the API *skips* the WhatsApp send and labels it (it no longer posts to a placeholder
-   number that returned Twilio 572002 while looking like success). Needs a verified recipient in the
-   Twilio console, one-time.
+2. **`TWILIO_WHATSAPP_TO` not set** — owner: team — **CLOSED ✅ 2026-09-18**
+   Verified end-to-end: dispatch → Twilio 201 → **`delivered`** on the demo phone, twice.
+   `/whatsapp/status` now exposes recipient + live delivery state for the dashboard card.
 3. **Crew-recorded Tamil command** — owner: Venkata / Malaravan — OPEN
    `ui/assets/command_ta.wav` currently holds a **labelled synthetic TTS** backup. Generator:
    `python make_backup_audio.py`. Stage audio should still be a human take.
@@ -39,6 +38,22 @@ fails, `GET /llm/diag` shows the last model call's latency and `finish_reason` �
 diagnosis path for a silent LLM. Then do blockers 5 → 2 → 3 above.
 
 ## Eval log
+- **2026-09-18 (night, stage fail-safe): backup demo RECORDED + NARRATED** — `finale/backup_demo/`:
+  real Full Auto run captured in headed Chromium → `demo_backup_narrated.mp4` (H.264 + AAC,
+  1360×850, 34 s) with a Sarvam `bulbul:v3` narration track timed to the pipeline beats, plus a
+  silent 23 s cut, 3 proof stills and the transcript. Playlist rules in `backup_demo/README.md`
+  (honest labeling, fullscreen, never talk over the dispatch beat). ⚠ Recording drives a real
+  dispatch (WhatsApp + ledger mutate) — always `POST /demo/reset` after re-recording.
+- **2026-09-18 (evening, UI + WhatsApp pass): 86/86 battery green · 29/29 UI smoke green.**
+  - ✅ **WhatsApp verified END-TO-END for the first time**: approve → dispatch → n8n 200 →
+    Twilio **201** → Twilio API shows **`delivered`** (tomato + coriander, both). Re-join the
+    sandbox **the morning of the demo** — trial/sandbox participants reset (N8N_TWILIO_SETUP.md §1.4).
+  - New: `GET /whatsapp/status` (recipient + live Twilio delivery state), dispatch record now
+    keeps `twilio_sid`; dashboard gained a WhatsApp delivery card + numbered pipeline stepper.
+  - Dashboard rebuilt (`ui/index.html`): stepper (HEAR→DECIDE→APPROVE→DISPATCH→REMEMBER),
+    dynamic stock cards with `↑ delivered` markers, dead code removed, broken CSS vars fixed,
+    **STT language selector now actually wired** (was ignored — /stt always got ta-IN).
+  - ⚠ Sarvam key in `.env` is still the burned one (preflight flags it) — rotation is a human task.
 - **2026-09-18 (hardening pass): 86/86 battery green**, stable across 4 consecutive runs (0 failures,
   0 warnings). Reproduced by running the code, not reading it.
   Six defects were demo-breaking or doctrine-breaking. Full details + evidence: `finale/IMPROVEMENTS.md`.

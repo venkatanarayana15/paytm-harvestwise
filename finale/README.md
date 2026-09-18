@@ -32,6 +32,7 @@ finale/
   ui/assets/command_ta.wav CACHED BACKUP command audio (TTS — see labeling note)
   qa_battery.py            86 regression checks — run with the API up
   make_backup_audio.py     regenerates the cached backup audio
+  backup_demo/             RECORDED stage fail-safe: real Full Auto run as MP4 + proof panels
   FAILPATHS.md             the failure states + expected behavior
 ```
 
@@ -54,6 +55,10 @@ Demo command (deck-consistent): **"நாளை 20 கிலோ தக்கா�
 → basket: tomato 20 kg × ₹18 = ₹360 · coriander 10→6 bunches (rain −40%) × ₹31 = ₹186 · **₹546**.
 
 The parser also accepts "3 crates tomato" (60 kg) — for the ₹546 story use the 20 கிலோ phrasing.
+
+## If the LIVE demo dies (mic, STT, network, provider), play `backup_demo/demo_backup.mp4`
+fullscreen — a real recorded Full Auto run (dispatch → WhatsApp → ledger), not a mock.
+See `backup_demo/README.md`.
 
 ## Demo-safety switches (all optional, sensible defaults)
 | Var | Default | Effect |

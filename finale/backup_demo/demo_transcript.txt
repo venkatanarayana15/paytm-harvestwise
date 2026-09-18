@@ -1,0 +1,10 @@
+[13:48:53] demo state reset (seeded inventory, tokens cleared)
+[13:48:54] boot dashboard: file:///D:/Hackathons/paytm/finale/ui/index.html
+[13:48:57] clicking ⚡ Full Auto Demo
+[13:48:59] basket rendered — engine quantities visible
+[13:49:01] merchant approval (சரி) accepted — gate held, tokens issued
+[13:49:06] dispatch complete — n8n fired, ledger updated
+[13:49:06] memory/inventory panel updated
+[13:49:11] grounded reasoning (Sarvam fast) rendered — observations + engine-locked quantity
+[13:49:14] LEDGER: ✔ 2026-09-18T19:19:04  கொத்தமல்லி  6 bunch …
+[13:49:14] WHATSAPP: last message: sending · Fri, 18 Sep 2026 13:49:04 +0000 · via twilio-api

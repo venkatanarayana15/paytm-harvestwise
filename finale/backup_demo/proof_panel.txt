@@ -1,0 +1,15 @@
+HarvestWise — backup demo proof (generated 2026-09-18T13:49:17.383Z)
+
+Ledger panel:
+✔ 2026-09-18T19:19:04  கொத்தமல்லி  6 bunch
+   supplier: Basavanagudi Mandi · Rs.186
+   stock on hand: 6 → 12  (memory updated)
+
+✔ 2026-09-18T19:19:02  தக்காளி  20 kg
+   supplier: Basavanagudi Mandi · Rs.360
+   stock on hand: 12 → 32  (memory updated)
+
+WhatsApp panel:
+mode: live · to +917010919624
+last message: sending · Fri, 18 Sep 2026 13:49:04 +0000 · via twilio-api
+last order: 6 bunch coriander · Rs.186

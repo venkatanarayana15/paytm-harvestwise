@@ -22,7 +22,7 @@ import datetime
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -223,7 +223,18 @@ def health():
         "cognee": cognee_client.health(),
         "n8n": "configured" if os.getenv("N8N_WEBHOOK_URL") else "not_configured",
         "twilio": "configured" if os.getenv("TWILIO_ACCOUNT_SID") else "not_configured",
+        "twilio_mode": os.getenv("TWILIO_CONTENT_MODE", "template"),
         "twilio_recipient": os.getenv("TWILIO_WHATSAPP_TO", "NOT_SET"),
+        "copilot": {
+            "wa_akg": bool(os.getenv("WA_AKG_URL") and os.getenv("WA_AKG_API_KEY")
+                           and os.getenv("WA_AKG_SESSION")),
+            "twilio_freeform": bool(os.getenv("TWILIO_ACCOUNT_SID")),
+            "allowed_phones": sorted({_normalize_phone(p) for p in
+                                      os.getenv("COPILOT_ALLOWED_PHONES", "").split(",")}
+                                     if os.getenv("COPILOT_ALLOWED_PHONES") else
+                                     [x for x in [_normalize_phone(os.getenv("TWILIO_WHATSAPP_TO", ""))] if x]),
+            "pending_orders": len(pending_orders),
+        },
         "inventory_reset_on_start": os.getenv("DEMO_RESET_ON_START", "1"),
         "llm_last": dict(llm_mod.LAST),
     }
@@ -560,12 +571,29 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
         n_vars = max(int(os.getenv("TWILIO_TEMPLATE_VARS", "2") or 2), 2)
         record["twilio_vars"] = n_vars
         auth = base64.b64encode(f"{twilio_sid}:{twilio_token}".encode()).decode()
-        data = {
-            "To": recipient,
-            "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
-            "ContentSid": os.getenv("TWILIO_CONTENT_SID", ""),
-            "ContentVariables": json.dumps(_twilio_content_vars(record, order, n_vars)),
-        }
+        # TWILIO_CONTENT_MODE=freeform sends a plain Body (sandbox/dev — no
+        # template approval needed, kills the "Appt" bug). template (default)
+        # uses a registered ContentSid + ContentVariables (production).
+        content_mode = os.getenv("TWILIO_CONTENT_MODE", "template")
+        if content_mode == "freeform":
+            body = (f"HarvestWise order: {order['qty']} {order['product']} "
+                    f"({record['total_inr']} INR) -> {order['supplier']} "
+                    f"| stock {record.get('stock_before')}->{record.get('stock_after')} (ledger updated)")
+            data = {
+                "To": recipient,
+                "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
+                "Body": body,
+            }
+            record["twilio_mode"] = "freeform"
+            record["twilio_vars"] = 0
+        else:
+            data = {
+                "To": recipient,
+                "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
+                "ContentSid": os.getenv("TWILIO_CONTENT_SID", ""),
+                "ContentVariables": json.dumps(_twilio_content_vars(record, order, n_vars)),
+            }
+            record["twilio_mode"] = "template"
         r = httpx.post(f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
                        data=data, headers={"Authorization": f"Basic {auth}"}, timeout=10)
         record["twilio_status"] = r.status_code
@@ -578,6 +606,296 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
             record["twilio_note"] = "template send rejected — see Twilio console (dispatch still recorded)"
     except Exception as e:
         record["twilio_error"] = str(e)
+
+
+# ─── WhatsApp COPILOT (full Observe -> Ask -> Approve -> Act -> Learn loop) ──
+# Transport-agnostic: WA-AKG (live demo) > Twilio freeform (fallback) > mock log.
+# The webhook endpoints enforce an allowlist; /copilot/simulate is the offline
+# battery path and NEVER sends to a real user (force_mock=True).
+pending_orders: dict[str, dict] = {}
+
+
+def _normalize_phone(phone: str) -> str:
+    return re.sub(r"[^\d]", "", phone or "")
+
+
+def _allowed_copilot_phone(phone_digits: str) -> bool:
+    if not phone_digits:
+        return False
+    allow = os.getenv("COPILOT_ALLOWED_PHONES", "")
+    if allow:
+        allowed = {_normalize_phone(p) for p in allow.split(",") if _normalize_phone(p)}
+        return phone_digits in allowed
+    default = _normalize_phone(os.getenv("TWILIO_WHATSAPP_TO", ""))
+    return bool(default) and phone_digits == default
+
+
+def _stt_media(url: str, headers: dict | None = None, content_type: str = "") -> str:
+    """Download a WhatsApp voice note and transcribe it with Sarvam saaras:v3.
+    Saaras accepts OGG/OPUS natively — no ffmpeg conversion needed."""
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        return ""
+    try:
+        r = httpx.get(url, headers=headers or {}, timeout=20)
+        r.raise_for_status()
+        audio = r.content
+        if not audio:
+            return ""
+        codec = "ogg" if ("ogg" in content_type or "opus" in content_type) else "wav"
+        from sarvamai import SarvamAI
+        client = SarvamAI(api_subscription_key=api_key)
+        resp = client.speech_to_text.transcribe(
+            file=(f"voice.{codec}", audio), model="saaras:v3",
+            language_code="ta-IN", input_audio_codec=codec,
+        )
+        return (getattr(resp, "transcript", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
+    """Outbound copilot reply. Priority: WA-AKG -> Twilio freeform -> mock log.
+    Every outcome is labelled so a judge can see exactly which transport ran."""
+    phone_digits = _normalize_phone(phone)
+    if not force_mock:
+        wa_url = os.getenv("WA_AKG_URL")
+        wa_key = os.getenv("WA_AKG_API_KEY")
+        wa_session = os.getenv("WA_AKG_SESSION")
+        if wa_url and wa_key and wa_session:
+            try:
+                jid = f"{phone_digits}@s.whatsapp.net"
+                r = httpx.post(
+                    f"{wa_url.rstrip('/')}/api/messages/{wa_session}/{jid}/send",
+                    json={"message": {"text": text}},
+                    headers={"X-API-Key": wa_key}, timeout=10)
+                return {"transport": "wa-akg", "status": r.status_code,
+                        "jid": jid}
+            except Exception as e:
+                return {"transport": "wa-akg", "error": type(e).__name__}
+        tw_sid, tw_tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
+        if tw_sid and tw_tok:
+            try:
+                auth = base64.b64encode(f"{tw_sid}:{tw_tok}".encode()).decode()
+                r = httpx.post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{tw_sid}/Messages.json",
+                    data={"To": f"whatsapp:+{phone_digits}",
+                          "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
+                          "Body": text},
+                    headers={"Authorization": f"Basic {auth}"}, timeout=10)
+                return {"transport": "twilio-freeform", "status": r.status_code}
+            except Exception as e:
+                return {"transport": "twilio-freeform", "error": type(e).__name__}
+    try:
+        os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
+        with open(os.path.join(BASE_DIR, "data", "copilot_chat.log"), "a",
+                  encoding="utf-8") as lf:
+            lf.write(f"{datetime.datetime.now().isoformat(timespec='seconds')} | "
+                     f"To: {phone_digits} | {text}\n")
+        return {"transport": "mock-log", "status": "logged"}
+    except OSError:
+        return {"transport": "none", "error": "log unavailable"}
+
+
+def _approve_and_dispatch(phone_digits: str, pend: dict) -> list[dict]:
+    """Issue one single-use token per item and execute each (idempotent).
+    Mirrors /voice/approve + /dispatch exactly — no new money-moving code."""
+    results = []
+    for item in pend.get("items", []):
+        product = item.get("product")
+        qty = item.get("recommended_qty")
+        data = CATALOG.get(MERCHANT, {}).get(product)
+        if not data:
+            results.append({"product": product, "status": "rejected", "reason": "unknown_product"})
+            continue
+        valid, reason = validate_order(MERCHANT, product, qty, data["supplier"])
+        if not valid:
+            results.append({"product": product, "status": "rejected", "reason": reason})
+            continue
+        token = str(uuid.uuid4())
+        issued_tokens[token] = {"product": product, "qty": qty, "supplier": data["supplier"]}
+        out = dispatch_order({"token": token, "total_inr": item.get("total_inr"),
+                              "merchant_phone": f"whatsapp:+{phone_digits}"})
+        results.append(out)
+    return results
+
+
+def _confirm_text(results: list[dict]) -> str:
+    """The kill-shot bubble: order + total + stock movement, all from the ledger."""
+    lines, moves, total = ["HarvestWise ✅ Order dispatched"], [], 0
+    dispatched = [r for r in results if r.get("status") == "dispatched"]
+    if not dispatched:
+        return "HarvestWise: approval recorded but nothing dispatched (see engine response)."
+    for r in dispatched:
+        rec = r.get("record", {})
+        lines.append(f"• {rec.get('quantity_kg')} {rec.get('unit')} "
+                     f"{rec.get('name_tn') or rec.get('product')} -> Rs.{rec.get('total_inr')}")
+        moves.append(f"{rec.get('product')} {rec.get('stock_before')}->{rec.get('stock_after')}")
+        total += rec.get("total_inr") or 0
+    lines.append(f"Total Rs.{total}")
+    lines.append("Stock: " + ", ".join(moves) + " (ledger + memory updated)")
+    return "\n".join(lines)
+
+
+def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
+                             media_headers: dict | None = None,
+                             content_type: str = "", channel: str = "webhook") -> dict:
+    """The copilot brain. Voice/text in -> intent -> ask -> approve -> dispatch.
+
+    security: unknown callers are refused; merchant speech is DATA (injection
+    markers refused); quantities always come from rules/engine, never from an LLM.
+    """
+    phone_digits = _normalize_phone(phone)
+    force_mock = channel == "simulate"
+    if not _allowed_copilot_phone(phone_digits):
+        _copilot_send(phone_digits, "HarvestWise: unknown caller - order ignored.",
+                      force_mock=force_mock)
+        return {"status": "unknown_caller", "phone": phone_digits, "channel": channel}
+
+    transcript = (text or "").strip()
+    if media_url and not transcript:
+        transcript = _stt_media(media_url, media_headers, content_type)
+
+    low = transcript.lower()
+    if any(m in low for m in INJECTION_MARKERS):
+        _copilot_send(phone_digits,
+                      "HarvestWise: speech refused - embedded instructions were ignored.",
+                      force_mock=force_mock)
+        return {"status": "injection_blocked", "phone": phone_digits,
+                "transcript": transcript, "channel": channel}
+
+    if any(w in low for w in DENY_WORDS):
+        pending_orders.pop(phone_digits, None)
+        _copilot_send(phone_digits,
+                      "HarvestWise: order cancelled. Tell me what you need anytime.",
+                      force_mock=force_mock)
+        return {"status": "declined", "phone": phone_digits,
+                "transcript": transcript, "channel": channel}
+
+    if any(w in low for w in APPROVE_WORDS):
+        pend = pending_orders.pop(phone_digits, None)
+        if not pend:
+            _copilot_send(phone_digits,
+                          "HarvestWise: no pending order to approve. Send your order first.",
+                          force_mock=force_mock)
+            return {"status": "no_pending", "phone": phone_digits,
+                    "transcript": transcript, "channel": channel}
+        results = _approve_and_dispatch(phone_digits, pend)
+        confirm = _confirm_text(results)
+        _copilot_send(phone_digits, confirm, force_mock=force_mock)
+        rejected = [r for r in results if r.get("status") != "dispatched"]
+        return {"status": "dispatched" if not rejected else "partial",
+                "phone": phone_digits, "transcript": transcript,
+                "dispatched": [r for r in results if r.get("status") == "dispatched"],
+                "rejected": rejected, "confirm": confirm, "channel": channel}
+
+    rules = _rules_intent(transcript)
+    if rules["intent"] != "create_restock_order" or not rules.get("products"):
+        _copilot_send(phone_digits,
+                      "HarvestWise: I did not catch a product. Try: நாளை 20 கிலோ தக்காளி.",
+                      force_mock=force_mock)
+        return {"status": "no_intent", "phone": phone_digits,
+                "transcript": transcript, "channel": channel}
+
+    items, total = [], 0
+    for product, requested in rules["products"].items():
+        rec = recommendation(MERCHANT, product, requested)
+        items.append(rec)
+        total += rec["total_inr"]
+    weather = get_weather()
+    ask = llm_mod.template_ask(items, weather["rain_prob"])
+    suffix = ("\nசரி என்று பதில் சொல்லுங்கள் (reply சரி to confirm)."
+              if _detect_lang(transcript) == "ta" else
+              "\nReply சரி to confirm.")
+    message = f"{ask}{suffix}"
+    pending_orders[phone_digits] = {"products": rules["products"], "items": items,
+                                    "total_inr": total}
+    _copilot_send(phone_digits, message, force_mock=force_mock)
+    return {"status": "awaiting_approval", "phone": phone_digits,
+            "transcript": transcript, "basket_total_inr": total,
+            "items": [{"product": i["product"], "recommended_qty": i["recommended_qty"],
+                       "unit": i["unit"], "total_inr": i["total_inr"]} for i in items],
+            "ask": message, "engine": "rules", "channel": channel}
+
+
+@app.post("/wa/inbound")
+def wa_inbound(payload: dict):
+    """WA-AKG webhook: JSON {"event":"message.received","data":{...,"type":
+    "TEXT|AUDIO","content":"...","key":{"remoteJid":"91...@s.whatsapp.net"},
+    "fileUrl":"/media/..."}}."""
+    data = payload.get("data") or {}
+    phone = (data.get("from") or (data.get("key") or {}).get("remoteJid") or "")
+    text = data.get("content") or data.get("body") or ""
+    media = data.get("fileUrl") or (data.get("quoted") or {}).get("fileUrl") or ""
+    if media and not media.startswith("http"):
+        base = os.getenv("WA_AKG_URL", "")
+        if base:
+            media = base.rstrip("/") + media
+    headers = {"X-API-Key": os.getenv("WA_AKG_API_KEY", "")} if media and os.getenv("WA_AKG_API_KEY") else None
+    result = _handle_merchant_message(
+        phone, text=text, media_url=media, media_headers=headers,
+        content_type=data.get("mimetype") or data.get("contentType") or "",
+        channel="wa-akg")
+    return {"received": True, "result": result}
+
+
+@app.post("/twilio/inbound")
+async def twilio_inbound(request: Request):
+    """Twilio sandbox webhook (form-encoded): From, Body, NumMedia, MediaUrl0,
+    MediaContentType0. Voice notes arrive as audio/ogg -> Sarvam STT (native)."""
+    form = await request.form()
+    try:
+        form = dict(form)
+    except Exception:
+        form = {}
+    phone = form.get("From", "")
+    text = form.get("Body", "") or ""
+    media_url = form.get("MediaUrl0", "") or ""
+    content_type = form.get("MediaContentType0", "") or ""
+    headers = None
+    sid, tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
+    if media_url and sid and tok:
+        headers = {"Authorization":
+                   f"Basic {base64.b64encode(f'{sid}:{tok}'.encode()).decode()}"}
+    result = _handle_merchant_message(
+        phone, text=text, media_url=media_url, media_headers=headers,
+        content_type=content_type, channel="twilio")
+    return {"received": True, "result": result}
+
+
+@app.post("/copilot/simulate")
+def copilot_simulate(payload: dict):
+    """Offline end-to-end test of the copilot brain — battery + offline demo path.
+    Never sends to a real user: replies are returned in the body and logged to
+    data/copilot_chat.log (force_mock=True). No external services required."""
+    return _handle_merchant_message(
+        payload.get("phone", "917010919624"),
+        text=payload.get("text", ""),
+        media_url=payload.get("media_url", ""),
+        content_type=payload.get("media_type", ""),
+        channel="simulate")
+
+
+@app.get("/copilot/state")
+def copilot_state():
+    allow = os.getenv("COPILOT_ALLOWED_PHONES", "")
+    allowed = sorted({_normalize_phone(p) for p in allow.split(",")} if allow
+                     else [x for x in [_normalize_phone(os.getenv("TWILIO_WHATSAPP_TO", ""))] if x])
+    return {
+        "allowed_phones": allowed,
+        "pending_orders": {
+            phone: {"products": p["products"], "basket_total_inr": p["total_inr"]}
+            for phone, p in pending_orders.items()
+        },
+        "transports": {
+            "wa_akg": bool(os.getenv("WA_AKG_URL") and os.getenv("WA_AKG_API_KEY")
+                           and os.getenv("WA_AKG_SESSION")),
+            "twilio_freeform": bool(os.getenv("TWILIO_ACCOUNT_SID")),
+            "mock_log": True,
+        },
+        "note": "WA-AKG webhook -> /wa/inbound | Twilio sandbox webhook -> /twilio/inbound"
+                " | offline test -> /copilot/simulate",
+    }
 
 
 @app.get("/whatsapp/status")
