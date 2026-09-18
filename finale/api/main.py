@@ -92,22 +92,24 @@ TAMIL_WORDNUM = {"ஒன்று": 1, "இரண்டு": 2, "மூன்ற
 KANNADA_WORDNUM = {"ಒಂದು": 1, "ಎರಡು": 2, "ಮೂರು": 3, "ನಾಲ್ಕು": 4, "ಐದು": 5,
                    "ಆರು": 6, "ಏಳು": 7, "ಎಂಟು": 8, "ಒಂಬತ್ತು": 9, "ಹತ್ತು": 10,
                    "ಇಪ್ಪತ್ತು": 20, "ಮೂವತ್ತು": 30}
-WORDNUM = {**TAMIL_WORDNUM, **KANNADA_WORDNUM}
+HINDI_WORDNUM = {"एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5, "छह": 6, "सात": 7, "आठ": 8, "नौ": 9, "दस": 10, "बीस": 20, "तीस": 30}
+TELUGU_WORDNUM = {"ఒకటి": 1, "రెండు": 2, "మూడు": 3, "నాలుగు": 4, "ఐదు": 5, "ఆరు": 6, "ఏడు": 7, "ఎనిమిది": 8, "తొమ్మిది": 9, "పది": 10, "ఇరవై": 20, "ముప్పై": 30}
+WORDNUM = {**TAMIL_WORDNUM, **KANNADA_WORDNUM, **HINDI_WORDNUM, **TELUGU_WORDNUM}
 # unit word -> (canonical unit, multiplier into that unit)
 UNIT_WORDS = {
-    "கிலோ": ("kg", 1), "ಕಿಲೋ": ("kg", 1), "ಕೆಜಿ": ("kg", 1), "????": ("kg", 1), "????": ("kg", 1), "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
-    "கிரேட்": ("kg", 20), "ಕ್ರೇಟ್": ("kg", 20), "?????": ("kg", 20), "??????": ("kg", 20), "crate": ("kg", 20), "crates": ("kg", 20),
-    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "ಗೊಂಚಲು": ("bunch", 1), "ಕಟ್ಟು": ("bunch", 1), "??????": ("bunch", 1), "????": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
+    "கிலோ": ("kg", 1), "ಕಿಲೋ": ("kg", 1), "ಕೆಜಿ": ("kg", 1), "????": ("kg", 1), "????": ("kg", 1), "किलो": ("kg", 1), "కిలో": ("kg", 1), "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
+    "கிரேட்": ("kg", 20), "ಕ್ರೇಟ್": ("kg", 20), "?????": ("kg", 20), "??????": ("kg", 20), "क्रेट": ("kg", 20), "క్రేట్": ("kg", 20), "crate": ("kg", 20), "crates": ("kg", 20),
+    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "ಗೊಂಚಲು": ("bunch", 1), "ಕಟ್ಟು": ("bunch", 1), "??????": ("bunch", 1), "????": ("bunch", 1), "गुच्छा": ("bunch", 1), "కట్ట": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
 }
 PRODUCT_WORDS = {
-    "tomato": "tomato", "tomatoes": "tomato", "தக்காளி": "tomato", "tamatar": "tomato", "ಟೊಮ್ಯಾಟೊ": "tomato", "ಟೊಮೇಟೊ": "tomato",
+    "tomato": "tomato", "tomatoes": "tomato", "தக்காளி": "tomato", "tamatar": "tomato", "टमाटर": "tomato", "టమాటా": "tomato", "ಟೊಮ್ಯಾಟೊ": "tomato", "ಟೊಮೇಟೊ": "tomato",
     "coriander": "coriander", "kothamalli": "coriander", "கொத்தமல்லி": "coriander", "ಕೊತ್ತಂಬರಿ": "coriander", "ಕೊತ್ತುಂಬರಿ": "coriander",
-    "dhania": "coriander", "?????": "coriander", "???????": "coriander", "onion": "onion", "வெங்காயம்": "onion", "ಈರುಳ್ಳಿ": "onion",
-    "spinach": "spinach", "palak": "spinach", "????": "spinach", "??????": "spinach", "ಮುರೈಕೀರೈ": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
-    "potato": "potato", "aloo": "potato", "???": "potato", "???": "potato", "ಆಲೂಗಡ್ಡೆ": "potato", "உருளைக்கிழங்கு": "potato",
+    "dhania": "coriander", "धनिया": "coriander", "ధనియాలు": "coriander", "?????": "coriander", "???????": "coriander", "onion": "onion", "வெங்காயம்": "onion", "प्याज": "onion", "ఉల్లి": "onion", "ಈರುಳ್ಳಿ": "onion",
+    "spinach": "spinach", "palak": "spinach", "पालक": "spinach", "పాలకూర": "spinach", "????": "spinach", "??????": "spinach", "ಮುರೈಕೀರೈ": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
+    "potato": "potato", "aloo": "potato", "आलू": "potato", "ఆలూ": "potato", "???": "potato", "???": "potato", "ಆಲೂಗಡ್ಡೆ": "potato", "உருளைக்கிழங்கு": "potato",
 }
-APPROVE_WORDS = ["sari", "சரி", "ಸರಿ", "yes", "ha", "haan", "ಹೌದು", "ஆம்", "ok", "confirm"]
-DENY_WORDS = ["illa", "இல்ல", "ಇಲ್ಲ", "no", "venam", "வேண்டாம்", "ಬೇಡ", "nahi", "cancel", "stop"]
+APPROVE_WORDS = ["sari", "हाँ", "हां", "సరే", "சரி", "ಸರಿ", "yes", "ha", "haan", "ಹೌದು", "ஆம்", "ok", "confirm"]
+DENY_WORDS = ["illa", "नहीं", "కాదు", "இல்ல", "ಇಲ್ಲ", "no", "venam", "வேண்டாம்", "ಬೇಡ", "nahi", "cancel", "stop"]
 
 # Prompt-injection markers — merchant speech is DATA, never instructions.
 INJECTION_MARKERS = [

@@ -369,6 +369,43 @@ async function dispatchAll(){
   log('Second click would be refused: idempotency (FAILPATH #4)');
 }
 
+/* ── Quick demo helpers — one click per language ── */
+const QUICK_TEXT = {
+  ta: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி",
+  kn: "ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ",
+  hi: "कल 20 किलो टमाटर, 10 गुच्छे धनिया",
+  te: "రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు",
+  en: "tomato 20kg and 10 bunches coriander for tomorrow"
+};
+function quickDemo(lang){
+  document.getElementById('langSel').value = lang;
+  document.getElementById('typedCmd').value = QUICK_TEXT[lang];
+  runPipeline(QUICK_TEXT[lang]);
+}
+async function runFullAuto(){
+  log('⚡ Full Auto Demo — running Tamil 20+10 → 20+6 → approve → dispatch');
+  const t = QUICK_TEXT.ta;
+  document.getElementById('typedCmd').value = t;
+  await runPipeline(t);
+  let tries=0;
+  const iv=setInterval(async()=>{
+    tries++;
+    if(lastBasket && !document.getElementById('btnApproveTyped').disabled){
+      clearInterval(iv);
+      log('Auto-approving சரி...');
+      await approveVoice('சரி');
+      setTimeout(async()=>{
+        if(!document.getElementById('btnDispatch').disabled){
+          log('Auto-dispatching...');
+          await dispatchAll();
+          log('✅ Full Auto complete — ₹546 dispatched, ledger updated');
+        }
+      }, 400);
+    }
+    if(tries>20){ clearInterval(iv); log('Auto timed out — use manual steps'); }
+  }, 300);
+}
+
 /* ── Grounded reasoning (P2) ── */
 async function doReason(){
   log('POST /reason (grounded reasoning over real observations)');
