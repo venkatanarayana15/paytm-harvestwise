@@ -58,7 +58,7 @@ Must answer "Why did you recommend 20 kg?" from stored facts + deterministic cal
 ## Pitch (3:00 total)
 - 0:00–0:20 OPEN: "A vegetable vendor doesn't lose money because she lacks analytics. She loses money when tomorrow's tomatoes are ordered using yesterday's guess. HarvestWise listens in her language, understands her recent Paytm sales and stock, and — after her approval — sends the right restocking order to the wholesaler."
 - 0:20–0:40 PROBLEM: perishable time pressure; too much = waste, too little = missed sale; payment data tells what happened, not what to do next
-- 0:40–2:00 LIVE FLOW: sales+inventory view → Kannada command → transcription+intent → deterministic rec → Cognee explanation → approve → n8n executing → dispatch+inventory → Sarvam voice reply
+- 0:40–2:00 LIVE FLOW: sales+inventory view → Tamil command (crew-native) → transcription+intent → deterministic rec → Cognee explanation → approve (“சரி”) → n8n executing → dispatch+inventory → Sarvam voice reply
 - 2:00–2:25 ARCHITECTURE: each sponsor tool in ONE sentence
 - 2:25–2:50 BUSINESS/PILOT: vegetable vendors first (loss is immediate/measurable); pilot measures stockouts, spoilage, margin, time saved; then fresh-goods expansion
 - 2:50–3:00 CLOSE: "Most merchant assistants stop at advice. HarvestWise closes the loop between payment data, a purchase decision, and the action that protects the merchant's next day of income."

@@ -111,6 +111,9 @@ WEATHER_TTL = 600  # 10 min
 
 def weather_mode() -> str:
     """'seeded' (default, demo-safe) or 'live' (real Open-Meteo fetch)."""
+    # HARVESTWISE_DEMO_MODE=1 is an alias for WEATHER_MODE=seeded (review compatibility)
+    if os.getenv("HARVESTWISE_DEMO_MODE") == "1":
+        return "seeded"
     return (os.getenv("WEATHER_MODE") or "seeded").strip().lower()
 
 
