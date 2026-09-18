@@ -1,6 +1,6 @@
 # Ignore environment and local state files
 .env
-*.env
+.env.*
 
 # Python
 __pycache__/
