@@ -514,12 +514,20 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
     recipient = approval.get("merchant_phone") or os.getenv("TWILIO_WHATSAPP_TO")
     if not recipient:
         # Never post to the placeholder number — that produced error 572002 while
-        # looking like a real send. Refuse loudly instead, and stay labeled.
-        record["twilio_status"] = "skipped"
+        # looking like a real send. Mock it so the UI still shows a bubble.
+        record["twilio_status"] = "skipped — demo mode"
         record["twilio_note"] = (
-            "TWILIO_WHATSAPP_TO not set — refusing to send to a placeholder number. "
-            "Set it in .env (verified recipient in the Twilio console)."
+            "TWILIO_WHATSAPP_TO not set — mock WhatsApp logged (no placeholder send). "
+            "Set it + verify in Twilio console for a real buzz on stage."
         )
+        mock_msg = f"HarvestWise order: {order['qty']} {order['product']} ({record['total_inr']} INR) -> {order['supplier']}"
+        try:
+            os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
+            with open(os.path.join(BASE_DIR, "data", "mock_whatsapp.log"), "a", encoding="utf-8") as lf:
+                lf.write(f"{record['at']} | To: mock | {mock_msg}\n")
+            record["mock_whatsapp"] = mock_msg
+        except Exception:
+            pass
         return
     try:
         auth = base64.b64encode(f"{twilio_sid}:{twilio_token}".encode()).decode()
