@@ -440,6 +440,12 @@ def reason(payload: dict):
         "model": (llm_mod.DEEP_MODEL if profile == "deep" else llm_mod.FAST_MODEL) if out else None,
         "profile": profile,
         "elapsed_s": llm_mod.LAST.get("elapsed_s"),
+        "finish_reason": llm_mod.LAST.get("finish_reason"),
+        "fallback_reason": None if out else (
+            llm_mod.LAST.get("error") or
+            ("model returned no content (finish_reason=" + str(llm_mod.LAST.get('finish_reason')) +
+             ") — raise LLM_DEEP_MAX_TOKENS for the deep profile")
+        ),
         "quantities_from": "deterministic engine",
     }
 

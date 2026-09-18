@@ -16,17 +16,19 @@
       "name": "Schedule 6:30AM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [-220, 0]
     },
     {
       "parameters": {
-        "url": "https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&daily=precipitation_probability_max&timezone=Asia%2FKolkata",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
+        "url": "https://api.open-meteo.com/v1/forecast",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "key", "value": "OPENWEATHER_KEY" }
+            { "name": "latitude", "value": "12.9716" },
+            { "name": "longitude", "value": "77.5946" },
+            { "name": "daily", "value": "precipitation_probability_max" },
+            { "name": "timezone", "value": "Asia/Kolkata" },
+            { "name": "forecast_days", "value": "2" }
           ]
         },
         "options": {}
@@ -34,24 +36,45 @@
       "name": "Weather (IMD-shaped)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [0, 0],
       "onError": "continueRegularOutput",
-      "notes": "Demo-credible weather for Bengaluru. Option A (shown): open-meteo, no key — delete the query parameter. Option B: OpenWeather key via httpQueryAuth credential. Offline fallback: the HarvestWise API ships a seeded 78% value."
+      "notes": "Open-Meteo needs NO API key — an earlier version sent a bogus 'OPENWEATHER_KEY' query param, which was wrong and misleading. forecast_days=2 so index [1] is genuinely tomorrow, matching HarvestWise's semantics. Offline fallback: the API ships a seeded 78% value (WEATHER_MODE=seeded)."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "rain_pct",
+              "value": "={{ ($json.daily && $json.daily.precipitation_probability_max) ? $json.daily.precipitation_probability_max[1] : 78 }}",
+              "type": "number"
+            },
+            { "id": "b2", "name": "merchant_id", "value": "lakshmi", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Build briefing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "notes": "Falls back to 78 (the seeded demo constant) if the weather call fails, so the briefing never breaks."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.sid }}/Messages.json",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "contentType": "form-urlencoded",
         "bodyParameters": {
           "parameters": [
-            { "name": "To", "value": "whatsapp:+91XXXXXXXXXX" },
-            { "name": "From", "value": "whatsapp:+14155238886" },
-            { "name": "ContentSid", "value": "HXXXXXXX_BRIEFING_TEMPLATE_SID" },
-            { "name": "ContentVariables", "value": "={{ JSON.stringify({1: String($json.daily.precipitation_probability_max[0])}) }}" }
+            { "name": "To", "value": "={{ $env.TWILIO_WHATSAPP_TO }}" },
+            { "name": "From", "value": "={{ $env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886' }}" },
+            { "name": "ContentSid", "value": "={{ $env.TWILIO_BRIEFING_CONTENT_SID }}" },
+            { "name": "ContentVariables", "value": "={{ JSON.stringify({1: String($json.rain_pct)}) }}" }
           ]
         },
         "options": {}
@@ -61,11 +84,24 @@
       "typeVersion": 4.2,
       "position": [440, 0],
       "onError": "continueRegularOutput",
-      "notes": "Template (register in Twilio console): 'Good morning! Tomorrow {{1}}% rain expected. Reply SARI to get today's restocking suggestion.'"
+      "notes": "Set n8n env vars TWILIO_ACCOUNT_SID / TWILIO_WHATSAPP_TO / TWILIO_WHATSAPP_FROM / TWILIO_BRIEFING_CONTENT_SID. Credential 'twilio-basic' = httpHeaderAuth with header Authorization: Basic <base64(SID:AUTH_TOKEN)>. Template text: 'Good morning! Tomorrow {{1}}% rain expected. Reply SARI for today's restocking suggestion.' Trial accounts must add the merchant number as a verified recipient (Twilio error 572002 otherwise)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"briefing_sent\", \"rain_pct\": $json.rain_pct, \"at\": $now.iso() } }}",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Respond briefing",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
     }
   ],
   "connections": {
     "Schedule 6:30AM": { "main": [[{ "node": "Weather (IMD-shaped)", "type": "main", "index": 0 }]] },
-    "Weather (IMD-shaped)": { "main": [[{ "node": "WhatsApp Briefing", "type": "main", "index": 0 }]] }
+    "Weather (IMD-shaped)": { "main": [[{ "node": "Build briefing", "type": "main", "index": 0 }]] },
+    "Build briefing": { "main": [[{ "node": "WhatsApp Briefing", "type": "main", "index": 0 }]] },
+    "WhatsApp Briefing": { "main": [[{ "node": "Respond briefing", "type": "main", "index": 0 }]] }
   }
 }

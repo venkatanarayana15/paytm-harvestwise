@@ -7,27 +7,28 @@
 <style>
 :root{--navy:#002E6E;--blue:#00BAF2;--green:#10B981;--amber:#F59E0B;--red:#EF4444;--bg:#F8FAFC;--card:#fff;--border:#E2E8F0}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:#1E293B}
-header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
-header h1{margin:0;font-size:18px}header span{font-size:12px;opacity:.8}
-.wrap{max-width:960px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
-@media(max-width:700px){.wrap{grid-template-columns:1fr}}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:18px}header span{font-size:12px;opacity:.85}
+.wrap{max-width:1000px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
 .card h2{margin:0 0 10px;font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}
-.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:14px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:14px;gap:12px}
 .kv:last-child{border:0}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#E0F2FE;color:var(--navy)}
-.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:#fff;font-weight:600;cursor:pointer}
+.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:#fff;font-weight:600;cursor:pointer;font-size:14px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-rec{background:var(--red)}
 .btn-rec.recording{animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.6}}
 .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--border)}
-.log{font-family:ui-monospace,monospace;font-size:12px;background:#0F172A;color:#E2E8F0;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:220px;overflow:auto}
+.btn-sm{padding:6px 12px;font-size:12px}
+.log{font-family:ui-monospace,monospace;font-size:12px;background:#0F172A;color:#E2E8F0;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:240px;overflow:auto}
 .graph{display:flex;gap:8px;flex-wrap:wrap}
 .node{padding:6px 10px;border-radius:999px;background:#EFF6FF;border:1px solid #BFDBFE;font-size:12px}
 .edge{color:#64748B;font-size:12px;align-self:center}
-.flow{display:flex;gap:8px;align-items:center;font-size:13px}
-.dot{width:10px;height:10px;border-radius:50%;background:#CBD5E1}
+.flow{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:50%;background:#CBD5E1;display:inline-block}
 .dot.ok{background:var(--green)}.dot.run{background:var(--amber)}
 .full{grid-column:1 / -1}
 small{color:#64748B}
@@ -36,6 +37,10 @@ small{color:#64748B}
 .tn{font-size:16px}
 input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;font-size:14px;width:100%}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stock-up{color:var(--green);font-weight:700}
+.chip{font-size:11px;padding:2px 7px;border-radius:6px;background:#F1F5F9;color:#475569;border:1px solid var(--border)}
+.chip.llm{background:#EEF2FF;color:#3730A3;border-color:#C7D2FE}
+.chip.det{background:#ECFDF5;color:#065F46;border-color:#A7F3D0}
 </style>
 </head>
 <body>
@@ -47,13 +52,18 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
 <div class="wrap">
   <div class="card">
     <h2>Merchant — Lakshmi (representative persona)</h2>
-    <div class="kv"><span>Stock tomato</span><b>12 kg on hand</b></div>
-    <div class="kv"><span>Stock coriander</span><b>6 bunches on hand</b></div>
+    <div class="kv"><span>Stock tomato</span><b id="stockTomato">— kg on hand</b></div>
+    <div class="kv"><span>Stock coriander</span><b id="stockCoriander">— bunches on hand</b></div>
     <div class="kv"><span>Velocity (90d)</span><b>14 kg/day · <span style="color:var(--green)">+18%</span></b></div>
-    <div class="kv"><span>Weather (IMD) tomorrow</span><b id="wLine">78% rain · Basavanagudi</b></div>
+    <div class="kv"><span>Weather tomorrow</span><b id="wLine">—</b></div>
     <div class="kv"><span>Decay</span><b>tomato 2d · coriander 1d · 85% humidity</b></div>
     <div class="kv"><span>Supplier</span><b>Basavanagudi Mandi</b></div>
-    <small>Paytm-transaction-shaped seeded demo data — never live Paytm access (labeled)</small>
+    <div class="row" style="margin-top:10px">
+      <span class="chip" id="weatherChip">weather: —</span>
+      <span class="chip" id="engineChip">engine: deterministic</span>
+      <button class="btn btn-ghost btn-sm" onclick="resetDemo()">↺ Reset demo state</button>
+    </div>
+    <small id="stockNote">Paytm-transaction-shaped seeded demo data — never live Paytm access (labeled)</small>
   </div>
 
   <div class="card">
@@ -67,7 +77,7 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn btn-rec" id="btnMic" onclick="toggleMic()">🎙 Record command</button>
-      <button class="btn btn-ghost" onclick="playCached()" title="plays assets/command_ta.wav if present">▶ Cached audio</button>
+      <button class="btn btn-ghost" onclick="playCached()" title="plays ui/assets/command_ta.wav (cached backup audio)">▶ Cached audio</button>
     </div>
     <div class="row" style="margin-top:8px">
       <input class="txt" id="typedCmd" placeholder='typed fallback: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி"'>
@@ -85,15 +95,18 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
   </div>
 
   <div class="card">
-    <h2>Why this order? — Cognee causal memory</h2>
+    <h2>Why this order? — grounded reasoning</h2>
     <div class="graph" id="graph">
       <span class="node">Lakshmi → sells → Tomato · Coriander</span><span class="edge">→</span>
       <span class="node">velocity +18%</span><span class="edge">→</span>
-      <span class="node">stock 12kg · 6 bunches</span><span class="edge">→</span>
-      <span class="node">rain 78%</span><span class="edge">→</span>
-      <span class="node" style="background:var(--green);color:#fff" id="graphOut">20kg + 6 bunches</span>
+      <span class="node" id="gStock">stock —</span><span class="edge">→</span>
+      <span class="node" id="gRain">rain —</span><span class="edge">→</span>
+      <span class="node" style="background:var(--green);color:#fff" id="graphOut">awaiting order</span>
     </div>
-    <button class="btn btn-ghost" style="margin-top:10px" onclick="doRecall()">Recall from Cognee</button>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-ghost" onclick="doReason()">Reason (Sarvam-105B)</button>
+      <button class="btn btn-ghost" onclick="doRecall()">Recall from Cognee</button>
+    </div>
     <div id="recallBox" class="log" style="margin-top:10px;display:none"></div>
     <small>LLM explains, engine decides — every number from an Observation</small>
   </div>
@@ -110,6 +123,12 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
     <button class="btn btn-ghost" style="margin-top:8px" onclick="playSoundbox()">▶ Play on Soundbox</button>
     <audio id="soundboxPlayer" controls style="width:100%;display:none;margin-top:8px"></audio>
     <small>Same briefing plays on the Soundbox she already owns — upgrade, not new device</small>
+  </div>
+
+  <div class="card">
+    <h2>Inventory &amp; Memory — post-dispatch ledger</h2>
+    <div id="ledgerBox" class="log">No orders yet. Run the demo to see stock move and memory update.</div>
+    <small>Acceptance criterion: a visible memory/inventory update after execution</small>
   </div>
 
   <div class="card full">
@@ -133,13 +152,72 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
 </div>
 
 <script>
-const API = 'http://localhost:8000';
+// Use the IPv4 literal, NOT 'localhost'. Measured on this machine: 'localhost'
+// costs ~2s per request (IPv6 ::1 attempted first, then falls back), which made
+// every dashboard click feel broken. 127.0.0.1 responds in 3-35ms.
+const API = 'http://127.0.0.1:8000';
 let lastBasket=null, tokens={}, mediaRecorder=null, chunks=[], micMode='command';
 
 function log(m){ const el=document.getElementById('syslog'); el.textContent += '\n' + m; el.scrollTop=el.scrollHeight; }
 function dot(id,cls){ document.getElementById(id).className='dot'+(cls?' '+cls:''); }
-async function check(){ try{ const r=await fetch(API+'/health'); const j=await r.json(); document.getElementById('apiStatus').textContent='API ok'+(j.sarvam_key?'':' (no key → typed fallback)'); document.getElementById('apiStatus').style.background='#DCFCE7'; log('API health ok · sarvam key: '+j.sarvam_key);}catch(e){ document.getElementById('apiStatus').textContent='API offline — run uvicorn'; document.getElementById('apiStatus').style.background='#FEE2E2'; log('API offline: '+e)}}
-check();
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function check(){
+  try{
+    const r=await fetch(API+'/health'); const j=await r.json();
+    document.getElementById('apiStatus').textContent='API ok';
+    document.getElementById('apiStatus').style.background='#DCFCE7';
+    document.getElementById('weatherChip').textContent='weather: '+j.weather_mode;
+    document.getElementById('weatherChip').title = j.weather_mode==='seeded'
+      ? 'Seeded 78% — deterministic demo (set WEATHER_MODE=live for real Open-Meteo)' : 'Live Open-Meteo';
+    document.getElementById('engineChip').textContent='llm: '+j.llm_mode;
+    log('API health ok · weather_mode='+j.weather_mode+' · llm_mode='+j.llm_mode+' · cognee='+j.cognee);
+    if(j.twilio_recipient==='NOT_SET') log('⚠ TWILIO_WHATSAPP_TO not set — WhatsApp dispatch will be skipped (labeled), not faked');
+  }catch(e){
+    document.getElementById('apiStatus').textContent='API offline — run uvicorn';
+    document.getElementById('apiStatus').style.background='#FEE2E2'; log('API offline: '+e);
+  }
+}
+check(); refreshState();
+
+async function refreshState(){
+  try{
+    const r=await fetch(API+'/state'); const j=await r.json();
+    document.getElementById('stockTomato').innerHTML=esc(j.stock_on_hand.tomato)+' kg on hand'+(j.orders.length?' <span class="stock-up">↑</span>':'');
+    document.getElementById('stockCoriander').innerHTML=esc(j.stock_on_hand.coriander)+' bunches on hand';
+    const w=j.weather;
+    document.getElementById('wLine').textContent=Math.round(w.rain_prob*100)+'% rain · '+w.city+' ('+w.source+')';
+    document.getElementById('gRain').textContent='rain '+Math.round(w.rain_prob*100)+'% ('+w.source+')';
+    document.getElementById('gStock').textContent='stock '+j.stock_on_hand.tomato+'kg · '+j.stock_on_hand.coriander+' bunches';
+  }catch(e){ /* state is a nice-to-have; never break the demo */ }
+}
+
+function renderLedger(state){
+  const box=document.getElementById('ledgerBox');
+  if(!state.orders || !state.orders.length){
+    box.textContent='No orders yet. Run the demo to see stock move and memory update.'; return;
+  }
+  box.textContent = state.orders.map(o=>
+    `✔ ${o.at}  ${o.name_tn||o.product}  ${o.qty} ${o.unit}\n`+
+    `   supplier: ${o.supplier} · Rs.${o.total_inr}\n`+
+    `   stock on hand: ${o.stock_before} → ${o.stock_after}  (memory updated)`
+  ).join('\n\n');
+}
+
+async function resetDemo(){
+  try{
+    await fetch(API+'/demo/reset',{method:'POST'});
+    tokens={}; lastBasket=null;
+    document.getElementById('itemsBox').innerHTML='';
+    document.getElementById('transcriptLine').innerHTML='';
+    document.getElementById('btnDispatch').disabled=true;
+    document.getElementById('btnMicApprove').disabled=true;
+    document.getElementById('btnApproveTyped').disabled=true;
+    ['d1','d1b','d2','d3','d4'].forEach(d=>dot(d));
+    log('Demo state reset — seeded inventory restored');
+    refreshState();
+  }catch(e){ log('Reset failed: '+e.message); }
+}
 
 /* ── Mic capture: MediaRecorder → webm/opus → /stt ── */
 async function toggleMic(mode){
@@ -152,8 +230,10 @@ async function toggleMic(mode){
     mediaRecorder.ondataavailable = e=>chunks.push(e.data);
     mediaRecorder.onstop = async ()=>{
       stream.getTracks().forEach(t=>t.stop());
-      document.getElementById('btnMic').classList.remove('recording');
-      document.getElementById('btnMic').textContent='🎙 Record command';
+      const btnId = micMode==='approve' ? 'btnMicApprove' : 'btnMic';
+      const b=document.getElementById(btnId);
+      b.classList.remove('recording');
+      b.textContent = micMode==='approve' ? '🎙 Approve — say “சரி”' : '🎙 Record command';
       const blob = new Blob(chunks, {type:'audio/webm'});
       log('Mic: '+(blob.size/1024).toFixed(0)+' KB webm captured');
       if(micMode==='approve'){ await sttApprove(blob); } else { await sttCommand(blob); }
@@ -171,7 +251,7 @@ async function sttCommand(blob){
     const r=await fetch(API+'/stt', {method:'POST', body:fd});
     if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.detail||r.status); }
     const j=await r.json();
-    document.getElementById('transcriptLine').innerHTML='<b>Transcript:</b> '+j.transcript;
+    document.getElementById('transcriptLine').innerHTML='<b>Transcript:</b> '+esc(j.transcript);
     log('STT: '+j.transcript);
     await runPipeline(j.transcript);
   }catch(e){ dot('d1'); log('STT failed ('+e.message+') — typed-transcript fallback (labeled)'); }
@@ -187,7 +267,7 @@ async function sttApprove(blob){
 }
 function playCached(){
   const p=document.getElementById('cmdPlayer');
-  p.src='assets/command_ta.wav';
+  p.src='assets/command_ta.wav?v=3';
   p.play().catch(()=>log('No assets/command_ta.wav — crew records the Tamil command into ui/assets/'));
   log('Playing cached demo audio (backup path)');
 }
@@ -200,10 +280,11 @@ async function runPipeline(transcript){
   log('POST /intent');
   const ir=await fetch(API+'/intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript})});
   const intent=await ir.json();
-  log('Intent: '+JSON.stringify(intent));
+  log('Intent ['+(intent.engine||'rules')+']: '+JSON.stringify(intent));
+  if(intent.injection_detected) log('⚠ Injection attempt refused (merchant speech is data, not instructions)');
   if(intent.intent!=='create_restock_order'){
     dot('d1b');
-    document.getElementById('transcriptLine').innerHTML='<b>Heard:</b> “'+transcript+'” → <i>'+(intent.intent==='decline'?'declined — nothing ordered':intent.intent)+'</i>';
+    document.getElementById('transcriptLine').innerHTML='<b>Heard:</b> “'+esc(transcript)+'” → <i>'+(intent.intent==='decline'?'declined — nothing ordered':esc(intent.intent))+'</i>';
     return;
   }
   if(intent.clarification_needed) log('Note: some quantities not stated — engine fills from deterministic formula');
@@ -214,35 +295,48 @@ async function runPipeline(transcript){
   document.getElementById('btnMicApprove').disabled=false;
   document.getElementById('btnApproveTyped').disabled=false;
   await speakAsk();
+  upgradeAsk();   // Sarvam-105B rewrites the same, engine-locked numbers
 }
 function unitTn(u){ return u==='kg'?'கிலோ':'கொத்து'; }
 function renderBasket(){
   const box=document.getElementById('itemsBox'); box.innerHTML='';
-  let summary=[];
   lastBasket.items.forEach(it=>{
     const d=document.createElement('div'); d.className='item';
-    d.innerHTML='<b class="tn">'+it.product+' · <span>'+ (it.name_tn||'') +'</span></b> — she asked '+(it.requested||'—')+' → engine: <b style="color:var(--green)">'+it.recommended_qty+' '+it.unit+'</b> · ₹'+it.total_inr
-      +'<br><small>'+it.factors.map(f=>f.source+': '+f.fact).join(' · ')+'</small>';
+    d.innerHTML='<b class="tn">'+esc(it.name_tn||it.product)+'</b> <span class="chip det">'+esc(it.product)+'</span> — she asked '+(it.requested==null?'—':esc(it.requested))+' → engine: <b style="color:var(--green)">'+esc(it.recommended_qty)+' '+esc(it.unit)+'</b> · ₹'+esc(it.total_inr)
+      +'<br><small>'+it.factors.map(f=>esc(f.source)+': '+esc(f.fact)).join(' · ')+'</small>';
     box.appendChild(d);
-    summary.push(it.recommended_qty+' '+unitTn(it.unit)+' '+(it.name_tn||it.product));
   });
   const t=document.createElement('div'); t.className='item'; t.style.background='#ECFDF5';
-  t.innerHTML='<b>Basket total: ₹'+lastBasket.basket_total_inr+'</b>';
+  t.innerHTML='<b>Basket total: ₹'+esc(lastBasket.basket_total_inr)+'</b>';
   box.appendChild(t);
-  document.getElementById('graphOut').textContent=lastBasket.items.map(i=>i.recommended_qty+' '+i.unit).join(' + ')+' dispatched';
+  const out=lastBasket.items.map(i=>i.recommended_qty+' '+i.unit).join(' + ');
+  document.getElementById('graphOut').textContent=out+' dispatched';
+  document.getElementById('gStock').textContent='stock '+lastBasket.items.map(i=>(i.name_tn||i.product)+' '+i.stock_on_hand).join(' · ');
   log('Basket: '+lastBasket.items.map(i=>i.product+' '+i.recommended_qty+i.unit).join(', ')+' = ₹'+lastBasket.basket_total_inr);
 }
 async function speakAsk(){
-  const ask='நாளை மழை '+Math.round((lastBasket.weather.rain_prob||0.78)*100)+' சதவீதம் இருக்கும். நாளை '+lastBasket.items.map(i=>i.recommended_qty+' '+unitTn(i.unit)+' '+(i.name_tn||'')).join(', ')+' வேண்டுமா? வேண்டும் என்றால் “சரி” என்று சொல்லுங்கள்.';
   try{
-    const t=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:ask,lang:'ta-IN'})});
+    const t=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:lastBasket.ask,lang:'ta-IN'})});
     if(t.ok){ const b=await t.blob(); const u=URL.createObjectURL(b); const p=document.getElementById('player'); p.src=u; p.style.display='block'; p.play(); }
     else { const j=await t.json().catch(()=>({})); log('TTS skipped: '+(j.detail||t.status)); }
   }catch(e){ log('TTS fallback: '+e.message); }
 }
+async function upgradeAsk(){
+  try{
+    const r=await fetch(API+'/explain',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({products:Object.fromEntries(lastBasket.items.map(i=>[i.product,i.requested]))})});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j.source==='template-fallback') return;
+    log('Sarvam-105B explanation ('+j.source+'): '+j.text);
+    const el=document.getElementById('transcriptLine');
+    el.innerHTML += '<br><b>Sarvam-105B says:</b> <span class="tn">'+esc(j.text)+'</span>';
+  }catch(e){ /* template ask is already spoken; uplift is optional */ }
+}
 
 /* ── Approval gate ── */
 async function approveVoice(transcript){
+  if(!lastBasket){ log('Nothing to approve yet'); return; }
   dot('d2','run');
   const items=lastBasket.items.map(i=>({product:i.product, qty:i.recommended_qty}));
   const r=await fetch(API+'/voice/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript, items, basket_total_inr:lastBasket.basket_total_inr})});
@@ -255,6 +349,7 @@ async function approveVoice(transcript){
 
 /* ── Dispatch (single-use tokens; duplicates refused server-side) ── */
 async function dispatchAll(){
+  if(!lastBasket){ log('Nothing to dispatch'); return; }
   dot('d3','run');
   const box=document.getElementById('n8nBox'); box.textContent='';
   for(const it of lastBasket.items){
@@ -263,11 +358,29 @@ async function dispatchAll(){
     const r=await fetch(API+'/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_token:token, total_inr:it.total_inr})});
     const j=await r.json();
     box.textContent+=JSON.stringify(j,null,1)+'\n';
-    if(j.status==='dispatched'){ log('Dispatched '+it.product+' → n8n '+(j.record.n8n||'not configured')+', twilio '+(j.record.twilio_status||'n/a')); }
-    else { log('Dispatch '+it.product+': '+j.status+' — '+(j.reason||'')); }
+    if(j.status==='dispatched'){
+      log('Dispatched '+it.product+' → n8n '+(j.record.n8n||'not configured')+', twilio '+(j.record.twilio_status||'n/a')
+          +', stock '+j.record.stock_before+'→'+j.record.stock_after+', memory updated');
+      dot('d4','ok');
+    } else { log('Dispatch '+it.product+': '+j.status+' — '+(j.reason||'')); }
   }
-  dot('d3','ok'); dot('d4','ok');
+  dot('d3','ok');
+  refreshState().then(async()=>renderLedger(await (await fetch(API+'/state')).json()));
   log('Second click would be refused: idempotency (FAILPATH #4)');
+}
+
+/* ── Grounded reasoning (P2) ── */
+async function doReason(){
+  log('POST /reason (grounded reasoning over real observations)');
+  try{
+    const r=await fetch(API+'/reason',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:'tomato',requested_qty:20})});
+    const j=await r.json();
+    document.getElementById('recallBox').style.display='block';
+    document.getElementById('recallBox').textContent=
+      'OBSERVATIONS (fetched by the API):\n'+j.observations.map(o=>'  '+o.tool+'('+o.args+') -> '+o.result).join('\n')
+      +'\n\nREASONING ['+j.source+']:\n  '+j.reasoning
+      +'\n\nmemory_note: '+(j.memory_note||'')+'\nquantities_from: '+j.quantities_from;
+  }catch(e){ log('Reason failed: '+e.message); }
 }
 
 /* ── Soundbox briefing — simulated rail ── */
@@ -289,18 +402,21 @@ async function playSoundbox(){
 
 /* ── Cognee recall via API (key stays server-side) ── */
 async function doRecall(){
+  const box=document.getElementById('recallBox');
+  box.style.display='block'; box.textContent='Querying Cognee graph (up to ~60s)…';
   log('Cognee recall: Why this order?');
   try{
-    const r=await fetch(API+'/cognee/recall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'Why 20 kg tomato and 6 bunches coriander?', datasets:['harvestwise']})});
+    const r=await fetch(API+'/cognee/recall',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'Why 20 kg tomato and 6 bunches coriander?'})});
     const j=await r.json();
-    document.getElementById('recallBox').style.display='block';
-    const txt = JSON.stringify(j,null,2);
-    if(j.error || txt.length < 80){
-      document.getElementById('recallBox').innerHTML = '<img src="../cognee/graph_fallback.svg" style="width:100%;background:#0F172A;border-radius:8px;padding:8px"><div style="margin-top:6px">'+txt.slice(0,700)+'</div>';
-    } else {
-      document.getElementById('recallBox').textContent=txt.slice(0,900);
+    if(j.error){
+      box.innerHTML='<img src="../cognee/graph_fallback.svg" style="width:100%;background:#0F172A;border-radius:8px;padding:8px">'
+        +'<div style="margin-top:6px">Cognee unavailable ('+esc(j.error)+') — showing labeled local graph fallback.</div>';
+      return;
     }
-  }catch(e){ log('Recall failed: '+e.message); document.getElementById('recallBox').style.display='block'; document.getElementById('recallBox').innerHTML='<img src="../cognee/graph_fallback.svg" style="width:100%">'; }
+    const results=(j.results||[]).map(x=>x.text||JSON.stringify(x)).join('\n\n');
+    box.textContent='COGNEE ('+j.source+', '+j.elapsed_s+'s, graph_completion):\n\n'+results.slice(0,1500);
+    log('Cognee recall ok in '+j.elapsed_s+'s');
+  }catch(e){ log('Recall failed: '+e.message); box.innerHTML='<img src="../cognee/graph_fallback.svg" style="width:100%">'; }
 }
 </script>
 </body>

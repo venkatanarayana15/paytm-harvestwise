@@ -3,7 +3,7 @@
     "sells": "tomato, coriander, onion, spinach",
     "recent_sales_velocity": "+18% vs last week (tomato 14kg/day avg)",
     "current_stock": "12 kg tomato, 6 bunches coriander, 15 kg onion, 4 bunches spinach on hand",
-    "expected_rain": "78% tomorrow (IMD, Basavanagudi — live via Open-Meteo)",
+    "expected_rain": "78% tomorrow (seeded demo constant; WEATHER_MODE=live fetches IMD/Open-Meteo)",
     "shelf_life": "tomato 2 days, coriander 1 day, onion 5 days, spinach 1 day at 85% humidity",
     "rain_sensitivity": "coriander -40% / spinach -50% / onion -9% rainy-day sales (90d history); tomato holds",
     "recommendation": "20 kg tomato + 6 bunches coriander (10 asked, rain-adjusted) — basket ₹546",
@@ -12,17 +12,51 @@
       "Tomato -> velocity -> +18% (14kg/day)",
       "Coriander -> rainy-day sales -> -40%",
       "Stock -> 12kg tomato, 6 bunches coriander, 15kg onion",
-      "Tomorrow -> rain -> 78% (live Open-Meteo)",
+      "Tomorrow -> rain -> 78%",
       "Engine -> tomato 20kg x1.0, coriander 10x0.6=6 bunches",
       "Basket -> 360 + 186 = Rs.546 -> approved & dispatched"
     ],
-    "updated": "2026-09-18T12:04:40.371975"
+    "order_history": [
+      {
+        "at": "2026-09-18T13:31:52",
+        "merchant_id": "lakshmi",
+        "product": "tomato",
+        "name_tn": "தக்காளி",
+        "qty": 20,
+        "unit": "kg",
+        "supplier": "Basavanagudi Mandi",
+        "total_inr": 360,
+        "token": "84279dd0-6a3d-428e-a8eb-04d566e3187d",
+        "stock_before": 12,
+        "stock_after": 32,
+        "source": "approved voice order -> n8n dispatch",
+        "memory_note": ""
+      },
+      {
+        "at": "2026-09-18T13:32:01",
+        "merchant_id": "lakshmi",
+        "product": "tomato",
+        "name_tn": "தக்காளி",
+        "qty": 20,
+        "unit": "kg",
+        "supplier": "Basavanagudi Mandi",
+        "total_inr": 360,
+        "token": "9252c1a2-ead3-4e9a-af07-d33512126261",
+        "stock_before": 32,
+        "stock_after": 52,
+        "source": "approved voice order -> n8n dispatch",
+        "memory_note": ""
+      }
+    ],
+    "updated": "2026-09-18T13:32:01",
+    "last_order": "20 kg தக்காளி (tomato) -> Basavanagudi Mandi (Rs.360)",
+    "stock_on_hand": 52
   },
   "rahul": {
     "sells": "tomato, potato",
     "recent_sales_velocity": "tomato 12kg/day, potato 15kg/day avg",
     "current_stock": "10 kg tomato, 20 kg potato on hand",
-    "expected_rain": "78% tomorrow (IMD, KR Market — live via Open-Meteo)",
+    "expected_rain": "78% tomorrow (seeded demo constant)",
     "shelf_life": "tomato 2 days, potato 10 days",
     "rain_sensitivity": "potato -5% rainy-day sales (history)",
     "recommendation": "fresh merchant — cold-start via federated patterns",
@@ -31,6 +65,7 @@
       "KR Market -> festival week -> demand up",
       "Engine -> cold-start federated pattern from similar stalls"
     ],
-    "updated": "2026-09-18T12:04:40.372012"
+    "order_history": [],
+    "updated": "2026-09-18T13:30:55"
   }
 }

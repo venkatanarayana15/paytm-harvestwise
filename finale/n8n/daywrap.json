@@ -7,26 +7,42 @@
   "nodes": [
     {
       "parameters": {
+        "httpMethod": "POST",
+        "path": "harvestwise-daywrap",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "c2a5d3b2-2222-4b8b-9f02-harvestdw02",
+      "name": "Day-Wrap Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-220, 0],
+      "notes": "Call this at close of business with {merchant_id, products_ordered, total_inr, sold_out_time, spoilage_prevented}. Replace the schedule trigger below with this webhook for a live demo; both are provided."
+    },
+    {
+      "parameters": {
         "rule": {
           "interval": [
-            { "field": "cronExpression", "expression": "0 9 * * *" }
+            { "field": "cronExpression", "expression": "0 21 * * *" }
           ]
         }
       },
-      "name": "Schedule 9:00AM",
+      "name": "Schedule 9:00PM (disabled path)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [-220, 200],
+      "disabled": true,
+      "notes": "Optional nightly trigger. The webhook above is the demo path — a scheduled node alone cannot receive merchant data."
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "d1", "name": "merchant_id", "value": "=lakshmi", "type": "string" },
-            { "id": "d2", "name": "products_ordered", "value": "={{ $json.body.products || {} }}", "type": "object" },
+            { "id": "d1", "name": "merchant_id", "value": "={{ $json.body.merchant_id || 'lakshmi' }}", "type": "string" },
+            { "id": "d2", "name": "products_ordered", "value": "={{ $json.body.products_ordered || {} }}", "type": "object" },
             { "id": "d3", "name": "spoilage_prevented", "value": "={{ $json.body.spoilage_prevented || 0 }}", "type": "number" },
             { "id": "d4", "name": "total_ordered_inr", "value": "={{ $json.body.total_inr || 0 }}", "type": "number" },
-            { "id": "d5", "name": "sold_out_time", "value": "={{ $json.body.sold_out_time || null }}", "type": "string" }
+            { "id": "d5", "name": "sold_out_time", "value": "={{ $json.body.sold_out_time || '' }}", "type": "string" }
           ]
         },
         "options": {}
@@ -34,14 +50,14 @@
       "name": "Extract day-end",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 0]
+      "position": [20, 0]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             { "id": "e1", "name": "learned", "value": "={{ $json.sold_out_time ? 'sold_out' : ($json.spoilage_prevented > 0 ? 'spoilage_avoided' : 'normal') }}", "type": "string" },
-            { "id": "e2", "name": "confidence_score", "value": "={{ $json.sold_out_time ? 1.0 : 0.7 }}", "type": "number" },
+            { "id": "e2", "name": "confidence_score", "value": "={{ $json.sold_out_time ? 1 : 0.7 }}", "type": "number" },
             { "id": "e3", "name": "timestamp", "value": "={{ $now.iso() }}", "type": "string" }
           ]
         },
@@ -50,60 +66,83 @@
       "name": "Create learning entry",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [440, 0]
+      "position": [240, 0]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $credentials.cognee_url }}/api/v1/harvest",
+        "url": "={{ $env.COGNEE_BASE_URL }}/api/v1/add_text",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.COGNEE_API_KEY }}" }
+          ]
+        },
         "sendBody": true,
         "contentType": "json",
         "bodyParameters": {
           "parameters": [
-            { "name": "merchant_id", "value": "={{ $json.merchant_id }}" },
-            { "name": "event_type", "value": "day_wrap" },
-            { "name": "data", "value": "={{ JSON.stringify($json) }}" },
-            { "name": "learned", "value": "={{ $json.learned }}" },
-            { "name": "confidence_score", "value": "={{ $json.confidence_score }}" }
+            { "name": "datasetName", "value": "harvestwise" },
+            { "name": "textData", "value": "={{ [ 'Day-wrap ' + $json.timestamp + ' merchant ' + $json.merchant_id + ' result ' + $json.learned + ' confidence ' + $json.confidence_score + ' total Rs.' + $json.total_ordered_inr ] }}" }
           ]
         },
         "options": {}
       },
-      "name": "Cognee learn",
+      "name": "Cognee add_text",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0],
+      "position": [460, 0],
       "onError": "continueRegularOutput",
-      "notes": "Updates causal memory: what worked, what didn't. Fallback: local JSON write if Cognee unavailable."
+      "notes": "Real Cognee write path (verified 2026-09-18). Uses $env.COGNEE_API_KEY — set it in n8n Cloud env vars. Previously this node referenced $credentials.cognee_url, which does not exist and produced a broken URL."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $credentials.api_url }}/memory",
+        "url": "={{ $env.COGNEE_BASE_URL }}/api/v1/cognify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.COGNEE_API_KEY }}" }
+          ]
+        },
         "sendBody": true,
         "contentType": "json",
         "bodyParameters": {
           "parameters": [
-            { "name": "merchant_id", "value": "={{ $json.merchant_id }}" },
-            { "name": "learned_entry", "value": "={{ JSON.stringify($json) }}" }
+            { "name": "datasets", "value": "={{ ['harvestwise'] }}" }
           ]
         },
         "options": {}
       },
-      "name": "Local memory update",
+      "name": "Cognee cognify",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 0],
-      "onError": "ignore",
-      "notes": "Fallback: writes to Cognee/memory.json if Cognee cloud unavailable."
+      "position": [680, 0],
+      "onError": "continueRegularOutput",
+      "notes": "Turns the day's text into graph structure. Measured ~4.8s."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"learned\", \"merchant_id\": $json.merchant_id, \"learned\": $json.learned, \"confidence_score\": $json.confidence_score, \"at\": $json.timestamp } }}",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Respond learned",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, -120]
     }
   ],
   "connections": {
-    "Schedule 9:00AM": { "main": [[{ "node": "Extract day-end", "type": "main", "index": 0 }]] },
+    "Day-Wrap Webhook": { "main": [[{ "node": "Extract day-end", "type": "main", "index": 0 }]] },
+    "Schedule 9:00PM (disabled path)": { "main": [[{ "node": "Extract day-end", "type": "main", "index": 0 }]] },
     "Extract day-end": { "main": [[{ "node": "Create learning entry", "type": "main", "index": 0 }]] },
-    "Create learning entry": { "main": [[{ "node": "Cognee learn", "type": "main", "index": 0 }]] },
-    "Cognee learn": { "main": [[{ "node": "Local memory update", "type": "main", "index": 0 }]] }
+    "Create learning entry": { "main": [[{ "node": "Cognee add_text", "type": "main", "index": 0 }]] },
+    "Cognee add_text": { "main": [[{ "node": "Cognee cognify", "type": "main", "index": 0 }]] },
+    "Cognee cognify": { "main": [[{ "node": "Respond learned", "type": "main", "index": 0 }]] }
   }
 }

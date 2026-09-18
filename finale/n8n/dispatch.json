@@ -26,7 +26,9 @@
             { "id": "a2", "name": "approval_token", "value": "={{ $json.body.token || $json.body.approval_token }}", "type": "string" },
             { "id": "a3", "name": "quantity_kg", "value": "={{ $json.body.quantity_kg }}", "type": "number" },
             { "id": "a4", "name": "supplier", "value": "={{ $json.body.supplier }}", "type": "string" },
-            { "id": "a5", "name": "total_inr", "value": "={{ $json.body.total_inr }}", "type": "number" }
+            { "id": "a5", "name": "total_inr", "value": "={{ $json.body.total_inr }}", "type": "number" },
+            { "id": "a6", "name": "merchant_id", "value": "={{ $json.body.merchant_id || 'lakshmi' }}", "type": "string" },
+            { "id": "a7", "name": "stock_after", "value": "={{ $json.body.stock_after }}", "type": "number" }
           ]
         },
         "options": {}
@@ -52,6 +54,18 @@
               "leftValue": "={{ $json.approval_token }}",
               "rightValue": "",
               "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            },
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.quantity_kg }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            },
+            {
+              "id": "c4",
+              "leftValue": "={{ $json.supplier }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
             }
           ],
           "combinator": "and"
@@ -61,21 +75,22 @@
       "name": "Validate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [440, 0]
+      "position": [440, 0],
+      "notes": "Second independent validation (doctrine: n8n re-validates). Rejects missing token, zero quantity, or missing supplier BEFORE any message is sent."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.sid }}/Messages.json",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "contentType": "form-urlencoded",
         "bodyParameters": {
           "parameters": [
-            { "name": "To", "value": "whatsapp:+91XXXXXXXXXX" },
-            { "name": "From", "value": "whatsapp:+14155238886" },
-            { "name": "ContentSid", "value": "HXXXXXXX_ORDER_TEMPLATE_SID" },
+            { "name": "To", "value": "={{ $env.TWILIO_WHATSAPP_TO }}" },
+            { "name": "From", "value": "={{ $env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886' }}" },
+            { "name": "ContentSid", "value": "={{ $env.TWILIO_ORDER_CONTENT_SID }}" },
             { "name": "ContentVariables", "value": "={{ JSON.stringify({1: String($json.quantity_kg), 2: $json.product, 3: $json.supplier, 4: String($json.total_inr)}) }}" }
           ]
         },
@@ -86,12 +101,12 @@
       "typeVersion": 4.2,
       "position": [660, -80],
       "onError": "continueRegularOutput",
-      "notes": "Credential: httpHeaderAuth named 'twilio-basic' with header Authorization: Basic <base64(ACCOUNT_SID:AUTH_TOKEN)>. Replace To/ContentSid placeholders with verified sandbox values."
+      "notes": "Credential: httpHeaderAuth named 'twilio-basic' with header Authorization: Basic <base64(ACCOUNT_SID:AUTH_TOKEN)>. Env vars: TWILIO_ACCOUNT_SID, TWILIO_WHATSAPP_TO (verified recipient — trial error 572002 without this), TWILIO_WHATSAPP_FROM, TWILIO_ORDER_CONTENT_SID. Previously this used $credentials.sid (nonexistent) and a hardcoded 'whatsapp:+91XXXXXXXXXX' placeholder."
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"status\": \"dispatched\", \"product\": $json.product, \"quantity_kg\": $json.quantity_kg, \"supplier\": $json.supplier, \"total_inr\": $json.total_inr, \"whatsapp\": ($json.body && $json.body.sid) ? \"sent\" : \"dispatch_recorded_whatsapp_pending\", \"at\": $now.iso() } }}",
+        "responseBody": "={{ { \"status\": \"dispatched\", \"product\": $json.product, \"quantity_kg\": $json.quantity_kg, \"supplier\": $json.supplier, \"total_inr\": $json.total_inr, \"whatsapp\": ($json.sid ? 'sent' : 'dispatch_recorded_whatsapp_pending'), \"at\": $now.iso() } }}",
         "options": { "responseCode": 200 }
       },
       "name": "Respond dispatched",
@@ -102,13 +117,13 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={ \"status\": \"rejected\", \"reason\": \"missing product or approval_token — nothing dispatched\" }",
+        "responseBody": "={ \"status\": \"rejected\", \"reason\": \"validation failed in n8n — missing product, token, positive quantity, or supplier; nothing dispatched\" }",
         "options": { "responseCode": 422 }
       },
       "name": "Respond rejected",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [660, 120]
+      "position": [660, 140]
     }
   ],
   "connections": {

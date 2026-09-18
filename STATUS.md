@@ -1,31 +1,68 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-13
+Last updated: 2026-09-18
 
 ## Phase
-Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for next round (portal confirmed + team confirmed shortlist 2026-09-15).
-Finale: in-person build day — ACTIVE PREP.
-
-
-## Countdown — VERIFY WITH TEAM FIRST
-Round 1 deadline was "tomorrow" as of session start 2026-09-11/12. Today is 2026-09-13. If not uploaded, this is now <24h or OVERDUE — upload verification outranks everything.
+Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
+Finale: in-person build day — **vertical slice is BUILT AND VERIFIED** (see Eval log).
 
 ## Blockers (owner + status)
 1. Round-1 PDF upload confirmation — owner: team — CLOSED ✅ 2026-09-13
-2. SARVAM_API_KEY (indus.sarvam.ai free credits) — owner: team — OPEN
-3. Tamil command drafted + recorded WAV (crew-native; semantic: 3 crates tomatoes + 10 bunches coriander, tomorrow morning) — owner: Venkata / Malaravan — OPEN
-4. Dual-SKU demo sign-off (recommended: yes; fallback tomato-only) — owner: crew — OPEN
+2. **`TWILIO_WHATSAPP_TO` not set** — owner: team — OPEN
+   Without it the API *skips* the WhatsApp send and labels it (it no longer posts to a placeholder
+   number that returned Twilio 572002 while looking like success). Needs a verified recipient in the
+   Twilio console, one-time.
+3. **Crew-recorded Tamil command** — owner: Venkata / Malaravan — OPEN
+   `ui/assets/command_ta.wav` currently holds a **labelled synthetic TTS** backup. Generator:
+   `python make_backup_audio.py`. Stage audio should still be a human take.
+4. **Rotate burned keys** — owner: team — OPEN (see SECURITY.md)
+   Sarvam + Cognee + Twilio credentials were pasted into the root readme during build. Treat as burned.
+5. **Import + activate the 3 n8n JSONs on n8n cloud** — owner: team — OPEN
+   Set `$env` vars on the n8n side: `COGNEE_BASE_URL`, `COGNEE_API_KEY`, `TWILIO_ACCOUNT_SID`,
+   `TWILIO_WHATSAPP_TO`, `TWILIO_WHATSAPP_FROM`, `TWILIO_ORDER_CONTENT_SID`,
+   `TWILIO_BRIEFING_CONTENT_SID`, plus the `twilio-basic` httpHeaderAuth credential.
 
 ## Locked decisions (do not relitigate without new evidence)
 - Track 1 Merchant Growth AI; HarvestWise perishable-restocking wedge; Lakshmi = labeled representative persona
-- Demo language TAMIL primary + English fallback (supersedes Kannada plan; crew-fluent: Tamil/Telugu/English)
+- Demo language TAMIL primary + English fallback (crew-fluent: Tamil/Telugu/English)
 - Numbers: ledger 09 is law; billing = proposed + simulated; data = seeded + labeled
-- Mentor agent live (mode: all; restart opencode to activate /mentor)
+- **Demo determinism is a product decision**: `WEATHER_MODE=seeded` (default) so ₹546 holds any day;
+  `DEMO_RESET_ON_START=1` so rehearsals repeat. Live weather and the deep reasoning model are
+  deliberate *opt-ins*, never the default path.
+- **The live loop never uses the reasoning model.** Measured: `sarvam-105b` takes 32–61 s and returns
+  empty content when its token budget is consumed by reasoning. Fast loop = `sarvam-105b-conversations`
+  (~0.3–2 s); deep reasoning is a separate, labelled, on-demand call.
 
 ## Next single action
-Finale build is REAL and verified (22/22 API battery 2026-09-18): STT loop live (Sarvam saaras:v3, Tamil round-trip proven), deterministic engine calibrated (tomato 20kg / coriander 10→6 / ₹546 = deck), basket approve→dispatch with idempotency, UI has mic capture. Remaining: (1) record Tamil command WAV → `finale/ui/assets/command_ta.wav` — use "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி" (NOT "3 crates" — that parses to 60kg and breaks the ₹546 story), (2) Twilio console: add merchant number as verified recipient (err 572002), (3) import-test the 3 repaired n8n JSONs on n8n cloud + activate, (4) rotate the Sarvam + n8n keys that were pasted into the root readme (now redacted; treat as burned).
+Build day is INTEGRATE, not build. Run `python qa_battery.py` first (expect **83/83**); if anything
+fails, `GET /llm/diag` shows the last model call's latency and `finish_reason` — that is the fastest
+diagnosis path for a silent LLM. Then do blockers 5 → 2 → 3 above.
 
 ## Eval log
-- 2026-09-18: build verified — 22/22 checks: intent battery (Tamil numeric/word-num/decline/ambiguous), engine invariants (20kg/6bunches/₹546/rain 78%), approve→dispatch security (replay+bogus refused, deny gate held), graceful 400s, real STT round-trip → intent tomato=20. Secrets redacted from readme, .gitignore added. n8n JSONs rewritten to modern schemas (v2 IF + false branch, body extraction, Twilio HTTP node) after static audit found: body-wrapper bug (would hang webhook), wrong WhatsApp provider node, missing connections in briefing, no daywrap respond node. Cognee cloud probe: UP.
-- 2026-09-13: mentor red-team battery 5/5 — numbers-trap refusal (G1) ✓ · scope-creep kill with hidden costs (G3) ✓ · hostile-paste Adopt/Fix/Reject (G6+G1) ✓ · trivial lookup direct answer, no trace ✓ (but over-read 14 files → added Pass-2 retrieval-economy rule) · judge-Q&A one-breath trust answer ✓. Default-to-frozen-scope on the open dual-SKU call = correct G3 behavior.
-- 2026-09-13: battery #2 4/4 — deadline triage under 3h pressure (cut both options, stabilize+record plan with owner) ✓ · G5 escalation on data-sharing consent (refuse + options + human sign-off gate) ✓ · G2 multi-question (answered track call, queued latency/LinkedIn with reasons) ✓ · unknown-fact refusal on Soundbox pricing (offered web-check path, compliant swap) ✓. Re-test: retrieval-economy fix works (2 files vs 14). FINAL: 9.5/10 across 10 adversarial tests; no further prompt defects found.
+- **2026-09-18 (hardening pass): 83/83 battery green.** Reproduced by running the code, not reading it.
+  Six defects were demo-breaking or doctrine-breaking. Full details + evidence: `finale/IMPROVEMENTS.md`.
+  - 🔴 "Live weather" had **never worked**: a pre-encoded timezone (`Asia%2FCalcutta`) was double-encoded
+    by httpx → HTTP 400 on every call, hidden by `except: pass`. Also fetched *today* while narrating
+    "tomorrow".
+  - 🔴 ₹546 was weather-dependent with no lock (dry day → coriander 10 → ₹670, failing two checks).
+  - 🔴 All four WAV assets were byte-identical; `command_ta.wav` was the TTS *question*, not the order,
+    so the cached-audio backup silently dropped coriander.
+  - 🔴 WhatsApp never sent: no `TWILIO_WHATSAPP_TO` → posted to the placeholder number → Twilio 572002.
+  - 🟠 Acceptance criterion #5 was unimplemented: memory.json unchanged and stock still 12 after a 20 kg
+    order. Now a real ledger (`stock_before → stock_after`), an `order_history` audit trail and `/state`.
+  - 🟠 Cognee was half-wired: recall timed out (10 s client budget vs 12.3 s real latency) and there was
+    **no write path at all**. Now `add_text → cognify → recall` verified live against the tenant.
+  - 🟠 Sarvam's LLM was never called despite P1–P4 existing. Now wired with the fast/reasoning model
+    split, quantities structurally discarded, a grounding gate, and hard timeouts.
+  - 🟠 `recommendation()` never returned `name_tn` → every Tamil product name rendered blank.
+  - 🟡 `localhost` cost **~2035 ms per request** vs **3–33 ms** for `127.0.0.1` (IPv6 fallback).
+    The dashboard was on `localhost`, so every click felt broken.
+  - 🟡 n8n used nonexistent credentials (`$credentials.sid`, `cognee_url`, `api_url`); briefing sent a
+    bogus `OPENWEATHER_KEY` to open-meteo; daywrap/briefing had no respond node.
+  - 🟡 Docs contradicted each other (22 vs 28 vs the real 31 checks; a 20%-rain script vs the 78% story;
+    Kannada-first DEMOSCRIPT vs Tamil-first build).
+  - Verified in the same pass: injection refusal, idempotency surviving restart, backup audio
+    transcribing to `{tomato:20, coriander:10}`, seeded 78%/₹546, live path 94%, dashboard DOM render.
+- 2026-09-18 (earlier): 31/31 checks — intent battery, engine invariants (20kg/6 bunches/₹546/rain 78%),
+  approve→dispatch security (replay + bogus refused, deny gate held), graceful 400s, real STT round-trip.
+- 2026-09-13: mentor red-team battery 9.5/10 across 10 adversarial tests; no further prompt defects found.

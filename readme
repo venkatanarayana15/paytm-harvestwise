@@ -1,30 +1,49 @@
 # Paytm Build for India AI Hackathon — Team Workspace
 
-Goal: Win Round 1 (PPT/PDF submission) and carry through to the Bengaluru finale.
+Goal: win the Bengaluru finale.
+Status: **Round 1 SHORTLISTED ✅** · finale vertical slice **BUILT + VERIFIED (83/83 battery, dashboard
+renders end-to-end)**. Full audit of what was fixed: `finale/IMPROVEMENTS.md`.
 
-## Secrets policy (redacted 2026-09-18)
-All keys live in `.env` files only — never in docs, never in chat logs, never in code.
-- Sarvam API key → `finale/.env` → `SARVAM_API_KEY`
-- n8n access (webhook + MCP token) → `finale/.env` → `N8N_WEBHOOK_URL`, `N8N_MCP_TOKEN`
-- If any key was previously pasted into this file or shared in chats, consider it burned: rotate on the provider dashboard before the finale.
 ## Decision (locked)
 - Track: 1 — Merchant Growth AI
 - Niche: perishable-goods micro-merchants (vegetable vendors as hero persona)
 - Product: HarvestWise — voice-first AI growth copilot (WhatsApp + Paytm merchant world)
-- Stack: Sarvam AI (Indic voice/LLM) + n8n (agent orchestration) + Cognee (merchant memory) — the organizers' own partner stack
+- Stack: Sarvam AI (Indic voice + LLM) + n8n (agent orchestration) + Cognee (merchant memory)
+- Demo language: **Tamil primary**, English fallback (crew-fluent)
+
+## Secrets policy
+All keys live in `.env` files only — never in docs, never in chat logs, never in code.
+- Sarvam / Cognee / Twilio / n8n values → `finale/.env` (template: `finale/.env.example`)
+- **Keys pasted into this file during build are burned — rotate before the finale:** see `SECURITY.md`.
 
 ## Folder map
-- `STATUS.md` — living mission log (phase, countdown, blockers+owners, locked decisions). Read first, update on change.
-- `knowledge/` — hackathon brief, track decision, Paytm facts, partner-stack playbook, pitch strategy, collision analysis, finale doctrine, verified-facts ledger (09 = single source of truth), prompt-engineering pack (10: CoT/ReAct prompts for the Sarvam-105B agent), mentor deep playbook (11: judge rubric, demo choreography, backup protocol, triage matrix)
-- `.opencode/agent/hackathon-mentor.md` — Mentor agent (mode: all — selectable as a primary agent in the TUI switcher AND invocable via `/mentor <question>`; inherits your default model). HERMES 6-pass protocol, guardrails G1-G5, judge-rubric + triage + Q&A control skills. Restart opencode to activate.
-- `deck/deck.html` — the Round 1 deck (self-contained, print-ready 1280x720)
-- `deck/DECK-COPY.md` — slide-by-slide copy for quick edits
-- `deck/*.pdf` — final upload artifact
+- `STATUS.md` — living mission log (phase, blockers+owners, locked decisions, eval log). Read first.
+- `proof.md` — Round 1 submission evidence pack (historical record of the submitted deck).
+- `knowledge/` — brief, track decision, Paytm facts, partner-stack playbook, pitch strategy, collision
+  analysis, finale doctrine, verified-facts ledger (**09 = single source of truth**), prompt-engineering
+  pack (10), mentor deep playbook (11).
+- `deck/deck.html` + `deck/*.pdf` — the Round 1 deck and the uploaded artifact.
+- `finale/` — the finale build (see `finale/README.md` for structure, endpoints and demo-safety
+  switches). Start with `python finale/qa_battery.py` once the API is up.
+- `.opencode/agent/hackathon-mentor.md` — Mentor agent (mode: all; also `/mentor <question>`).
 
-## Regenerate PDF after editing deck.html
-Open deck.html in the browser (Edge) and Ctrl+P -> Save as PDF (paper size auto = 1280x720, margins none), or run:
-Edge headless (see knowledge/01, bottom).
+## Run the finale build
+```
+cd finale
+pip install -r requirements.txt
+cp .env.example .env                 # add SARVAM_API_KEY
+python data/seed_gen.py && python cognee/seed_memory.py
+python -m uvicorn api.main:app --port 8000
+start ui/index.html                  # dashboard
+python qa_battery.py                 # expect 83 passed, 0 failed
+```
+Use **http://127.0.0.1:8000**, not `http://localhost:8000` — measured, `localhost` costs ~2 s per
+request in this environment (IPv6 fallback) versus 3–35 ms for the IPv4 literal.
 
-## Round 1 checklist (from organizers)
-Title Slide / Problem Statement / Proposed Solution / Tech Stack / USP / Impact & Benefits / Business Model
-Upload PDF in the "Round 1 / Rounds" section of the portal. If portal says "You have not reached this round", wait 2-3 hrs and retry.
+## Regenerate the deck PDF after editing deck.html
+Open `deck/deck.html` in Edge, Ctrl+P → Save as PDF (paper size 1280x720, margins none), or use the
+Edge headless command noted at the bottom of `knowledge/01`.
+
+## Round 1 checklist (from organizers) — completed
+Title Slide / Problem Statement / Proposed Solution / Tech Stack / USP / Impact & Benefits /
+Business Model → PDF uploaded and shortlisted.
