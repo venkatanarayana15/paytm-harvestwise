@@ -68,6 +68,10 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
 
   <div class="card">
     <h2>Live Demo — one voice note → executed order</h2>
+    <div class="row" style="background:var(--green-bg);border:1px solid var(--green-line);border-radius:var(--r-sm);padding:10px 12px;margin:10px 0">
+      <button class="btn btn-green" onclick="runFullAuto()" style="font-size:15px;padding:12px 20px">⚡ Full Auto Demo</button>
+      <span style="font-size:12.5px;color:#065F46">Runs: Tamil command → engine 20+6=₹546 → approve சரி → dispatch → ledger. One click.</span>
+    </div>
     <div class="flow" id="flow">
       <span class="dot" id="d1"></span> STT
       <span class="dot" id="d1b"></span> Reco
@@ -78,6 +82,20 @@ input.txt{border:1px solid var(--border);border-radius:999px;padding:9px 14px;fo
     <div class="row" style="margin-top:12px">
       <button class="btn btn-rec" id="btnMic" onclick="toggleMic()">🎙 Record command</button>
       <button class="btn btn-ghost" onclick="playCached()" title="plays ui/assets/command_ta.wav (cached backup audio)">▶ Cached audio</button>
+      <select id="langSel" style="border:1.5px solid var(--border);border-radius:999px;padding:9px 12px;font-size:13px;background:#fff">
+        <option value="ta">Tamil</option>
+        <option value="kn">Kannada</option>
+        <option value="hi">Hindi</option>
+        <option value="te">Telugu</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-ghost btn-sm" onclick="quickDemo('ta')">TA: 20 கிலோ</button>
+      <button class="btn btn-ghost btn-sm" onclick="quickDemo('kn')">KN: 20 ಕಿಲೋ</button>
+      <button class="btn btn-ghost btn-sm" onclick="quickDemo('hi')">HI: 20 किलो</button>
+      <button class="btn btn-ghost btn-sm" onclick="quickDemo('te')">TE: 20 కిలో</button>
+      <button class="btn btn-ghost btn-sm" onclick="quickDemo('en')">EN: 20kg</button>
     </div>
     <div class="row" style="margin-top:8px">
       <input class="txt" id="typedCmd" placeholder='typed fallback: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி"'>
