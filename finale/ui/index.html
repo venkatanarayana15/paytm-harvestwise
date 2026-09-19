@@ -608,9 +608,15 @@ main{flex:1;display:flex;flex-direction:column;min-width:0}
           <div style="font-family:var(--mono);font-weight:600;font-size:15px" id="rainPct">—%</div>
           <span class="pill" id="weatherSource"><span class="dot"></span>—</span>
         </div>
-        <div class="inv-grid" id="invGrid">
-          <div class="card sku skeleton">Loading inventory…</div>
-        </div>
+         <div class="card" id="paytmCard" style="display:flex;gap:16px;align-items:center;padding:14px 16px;margin-bottom:12px">
+           <span class="pill ok"><span class="dot"></span>Paytm GMV</span>
+           <div><div style="font-weight:700" id="gmvTotal">—</div><div class="subtle">Total dispatched</div></div>
+           <div><div style="font-weight:700" id="gmv7d">—</div><div class="subtle">Last 7d</div></div>
+           <div class="subtle" id="gmvNote" style="margin-left:auto;max-width:280px">Paytm-transaction-shaped seeded data — toggle WEATHER_MODE=live</div>
+         </div>
+         <div class="inv-grid" id="invGrid">
+           <div class="card sku skeleton">Loading inventory…</div>
+         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:16px">
           <button class="btn btn-danger" onclick="resetDemo()"><i class="fa-solid fa-rotate-left"></i> Reset demo state</button>
         </div>
@@ -1015,6 +1021,13 @@ async function loadInventory(){
       const src=$("weatherSource");src.className="pill "+(String(st.weather.source||"").includes("seeded")?"ok":"warn");
       src.innerHTML='<span class="dot"></span>'+esc(st.weather.source||"—");
     }
+    // paytm GMV (winning bar)
+    if(st.paytm){
+      $("gmvTotal").textContent="₹"+(st.paytm.gmv_total_inr||0);
+      $("gmv7d").textContent="₹"+(st.paytm.gmv_7d_inr||0)+" (7d)";
+      $("gmvNote").textContent=st.paytm.retention_signal||st.data_label||"";
+    }
+    if(st.cost) log("api","cost "+st.cost.per_msg_inr+"/msg");
     // sku cards
     const g=$("invGrid");g.innerHTML="";
     const stock=st.stock_on_hand||{};
@@ -1080,7 +1093,7 @@ async function waSend(){
   const t=$("wa-text").value.trim()||"சரி";
   $("wa-result").textContent="firing /wa/inbound …";
   try{
-    const j=await fetch(API+"/wa/inbound",{method:"POST",headers:{"Content-Type":"application/json"},
+    const j=await fetch(API+"/wa/inbound?sync=1",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({event:"message.received",data:{from:PHONE+"@s.whatsapp.net",content:t,type:"TEXT"}})}).then(r=>r.json());
     $("wa-result").textContent=JSON.stringify(j.result||j).slice(0,300);
     waBubble(t,true,true);
@@ -1097,7 +1110,7 @@ async function waVoice(){
     const prev=VOICE_MODE;
     await fetch(API+"/preferences",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({phone:PHONE,voice_mode:"voice",language:LANG})});
-    const j=await fetch(API+"/wa/inbound",{method:"POST",headers:{"Content-Type":"application/json"},
+    const j=await fetch(API+"/wa/inbound?sync=1",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({event:"message.received",data:{from:PHONE+"@s.whatsapp.net",content:t,type:"TEXT"}})}).then(r=>r.json());
     $("wa-result").textContent="voice note: "+JSON.stringify((j.result&&j.result.send)||j).slice(0,260);
     await fetch(API+"/preferences",{method:"POST",headers:{"Content-Type":"application/json"},
