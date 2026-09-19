@@ -35,7 +35,7 @@ from engine.restock import (  # noqa: E402
     BASE_DIR, CATALOG, WEATHER, calculate_quantity, recommendation, validate_order,
     get_weather, reset_state, record_delivery, get_stock, stock_snapshot,
     order_history, RAINY_THRESHOLD, get_sales_forecast, get_bundle_suggestion,
-    get_margin_leader,
+    get_margin_leader, set_stock, add_stock, delete_stock, add_product,
 )
 from engine import cognee_client, llm as llm_mod
 
@@ -1876,6 +1876,77 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         optsG = _choice_options("greeted", lang)
         send = _copilot_send(phone_digits, answer + _tap_suffix(optsG, channel), force_mock=force_mock, voice_mode=vmode)
         return {"status": "answered", "question": "growth", "reply": answer, "options": optsG, "send": send, "language": lang, "engine": "growth-forecast+bundle+margin", "phone": phone_digits, "transcript": transcript, "channel": channel}
+
+    # ── Copilot sales briefing — MUST be before qkind check!
+    if any(k in low for k in ["show sales","today sales","sales","daily sales","yesterday sales"]):
+        hist=order_history(MERCHANT,50)
+        days=30 if "yesterday" not in low else 1
+        total=sum(row.get("total_inr",0) for row in hist[:days])
+        items=sum(row.get("qty",0) for row in hist[:days])
+        snap=stock_snapshot(MERCHANT)
+        reply={"ta":f"30‑day sales:\nRs.{total:.0f} ({items} items). Current stock:\n{snap.get('tomato','?')} tomato | {snap.get('coriander','?')} coriander","en":f"30‑day sales:\nRs.{total:.0f} ({items} items). Current stock:\n{snap.get('tomato','?')} tomato | {snap.get('coriander','?')} coriander"}.get(lang,f"Sales: Rs.{total:.0f} ({items} items). Stock: {snap}")
+        opts=_choice_options("greeted",lang)
+        send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status":"sales_report","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if any(k in low for k in ["morning briefing","daily briefing","buy today","tomorrow what to buy","what to buy tomorrow","need list","suggestion","what to buy"]):
+        weather=get_weather(); rain=int(round(weather.get("rain_prob",0)*100))
+        forecast=get_sales_forecast(MERCHANT); forecast_pct=int(round(forecast.get("lift",1.0)*100)) if isinstance(forecast,dict) else 100
+        leader=get_margin_leader(MERCHANT)
+        if isinstance(leader,dict): leader_product=leader.get("product","tomato"); leader_margin=int(leader.get("daily_margin",0))
+        else: leader_product="tomato"; leader_margin=0
+        snap=stock_snapshot(MERCHANT)
+        buys=[]
+        for prod in ["tomato","coriander","onion","spinach"]:
+            d=CATALOG[MERCHANT].get(prod,{}); vel=d.get("velocity",10); days=d.get("decay_days",2); unit=d.get("unit","kg")
+            stock=snap.get(prod,0); base=vel*days-stock; modifier=1.0 if rain<50 else 0.6; need=max(0,round(base*modifier))
+            if need>0: price=d.get("price_per_unit",18); buys.append(f"• {prod} {need} {unit} @ Rs.{price}")
+        reply={"ta":f"வணக்கம் {MERCHANT}! Naalai {rain}% mazhai. Naalai vechu:\n{chr(10).join(buys) if buys else 'No urgent buys.'} Forecast: {forecast_pct}% up. Margin leader: {leader_product} {leader_margin}rs.","en":f"Morning {MERCHANT}! Rain tomorrow: {rain}%. What to buy tomorrow:\n{chr(10).join(buys) if buys else 'No urgent buys.'} Sales forecast: {forecast_pct}% up. Margin leader: {leader_product} ₹{leader_margin}/day."}.get(lang,f"Morning {MERCHANT}! Rain: {rain}%. Buy tomorrow: {chr(10).join(buys) if buys else 'None.'} Forecast: {forecast_pct}% up. Margin: {leader_product} ₹{leader_margin}/day.")
+        opts=_choice_options("greeted",lang)
+        send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status":"morning_briefing","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+
+    # ── Inventory CRUD via copilot — must be before qkind (price/stock would hijack)
+    if any(k in low for k in ["add product","add inventory","create product"]):
+        m_prod = re.search(r"add (?:product|inventory)\s+([a-z]+)", low)
+        prod = m_prod.group(1).lower() if m_prod else _catalog_product_in(low) or "mango"
+        m_qty = re.search(r"(\d+)\s*(kg|bunch|bunches)?", low)
+        qty = int(m_qty.group(1)) if m_qty else 0
+        m_price = re.search(r"price\s*(\d+)", low)
+        price = int(m_price.group(1)) if m_price else 20
+        unit = "bunch" if "bunch" in low else "kg"
+        add_product(MERCHANT, prod, price=price, unit=unit, stock=qty)
+        reply = {"ta":f"{prod} added — {qty} {unit} @ Rs.{price}","en":f"{prod} added — {qty} {unit} @ Rs.{price}, inventory updated."}.get(lang,f"{prod} added.")
+        opts=_choice_options("greeted",lang)
+        send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status":"inventory_added","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if any(k in low for k in ["set stock","update stock","set inventory"]):
+        prod=_catalog_product_in(low)
+        m_qty=re.search(r"(\d+)\s*(kg|bunch)?", low)
+        if prod and m_qty:
+            qty=int(m_qty.group(1))
+            res=set_stock(MERCHANT, prod, qty)
+            reply={"ta":f"{prod} stock {res['before']}→{res['after']} updated.","en":f"{prod} stock {res['before']}→{res['after']} updated."}.get(lang,f"{prod} stock updated {res['after']}.")
+            opts=_choice_options("greeted",lang)
+            send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status":"stock_updated","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if "add stock" in low:
+        prod=_catalog_product_in(low)
+        m_qty=re.search(r"add stock\s*(\d+)", low) or re.search(r"(\d+)\s*(kg|bunch)", low)
+        if prod and m_qty:
+            delta=int(m_qty.group(1))
+            res=add_stock(MERCHANT, prod, delta)
+            reply={"ta":f"{prod} +{delta} → {res['after']}","en":f"{prod} +{delta} → {res['after']} added."}.get(lang,f"{prod} +{delta}")
+            opts=_choice_options("greeted",lang)
+            send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status":"stock_added","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if any(k in low for k in ["delete stock","remove stock","delete inventory","remove inventory","delete product"]):
+        prod=_catalog_product_in(low)
+        if prod:
+            delete_stock(MERCHANT, prod)
+            reply={"ta":f"{prod} deleted.","en":f"{prod} removed from inventory."}.get(lang,f"{prod} deleted.")
+            opts=_choice_options("greeted",lang)
+            send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status":"stock_deleted","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
 
     qkind = _question_kind(low)
     if qkind:
