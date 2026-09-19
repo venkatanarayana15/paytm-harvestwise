@@ -19,6 +19,8 @@ import re
 import base64
 import uuid
 import datetime
+import threading
+import concurrent.futures
 
 from contextlib import asynccontextmanager
 
@@ -32,7 +34,8 @@ from dotenv import load_dotenv
 from engine.restock import (  # noqa: E402
     BASE_DIR, CATALOG, WEATHER, calculate_quantity, recommendation, validate_order,
     get_weather, reset_state, record_delivery, get_stock, stock_snapshot,
-    order_history, RAINY_THRESHOLD,
+    order_history, RAINY_THRESHOLD, get_sales_forecast, get_bundle_suggestion,
+    get_margin_leader,
 )
 from engine import cognee_client, llm as llm_mod
 
@@ -58,7 +61,14 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="HarvestWise", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# Dev Mode: Allow any origin (frontend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ─── Approval token store: issued tokens are single-use (idempotent dispatch) ──
 issued_tokens: dict[str, dict] = {}
@@ -97,16 +107,22 @@ TELUGU_WORDNUM = {"ఒకటి": 1, "రెండు": 2, "మూడు": 3, "�
 WORDNUM = {**TAMIL_WORDNUM, **KANNADA_WORDNUM, **HINDI_WORDNUM, **TELUGU_WORDNUM}
 # unit word -> (canonical unit, multiplier into that unit)
 UNIT_WORDS = {
-    "கிலோ": ("kg", 1), "ಕಿಲೋ": ("kg", 1), "ಕೆಜಿ": ("kg", 1), "????": ("kg", 1), "????": ("kg", 1), "किलो": ("kg", 1), "కిలో": ("kg", 1), "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
-    "கிரேட்": ("kg", 20), "ಕ್ರೇಟ್": ("kg", 20), "?????": ("kg", 20), "??????": ("kg", 20), "क्रेट": ("kg", 20), "క్రేట్": ("kg", 20), "crate": ("kg", 20), "crates": ("kg", 20),
-    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "ಗೊಂಚಲು": ("bunch", 1), "ಕಟ್ಟು": ("bunch", 1), "??????": ("bunch", 1), "????": ("bunch", 1), "गुच्छा": ("bunch", 1), "కట్ట": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
+    # kg units
+    "கிலோ": ("kg", 1), "ಕಿಲೋ": ("kg", 1), "ಕೆಜಿ": ("kg", 1), "किलो": ("kg", 1), "కిలో": ("kg", 1),
+    "kg": ("kg", 1), "kilo": ("kg", 1), "kilos": ("kg", 1),
+    # crate = 20 kg
+    "கிரேட்": ("kg", 20), "ಕ್ರೇಟ್": ("kg", 20), "क्रेट": ("kg", 20), "క్రేట్": ("kg", 20),
+    "crate": ("kg", 20), "crates": ("kg", 20),
+    # bunch units
+    "கொத்து": ("bunch", 1), "கட்டு": ("bunch", 1), "ಗೊಂಚಲು": ("bunch", 1), "ಕಟ್ಟು": ("bunch", 1),
+    "गुच्छा": ("bunch", 1), "కట్ట": ("bunch", 1), "bunch": ("bunch", 1), "bunches": ("bunch", 1),
 }
 PRODUCT_WORDS = {
     "tomato": "tomato", "tomatoes": "tomato", "தக்காளி": "tomato", "tamatar": "tomato", "टमाटर": "tomato", "టమాటా": "tomato", "ಟೊಮ್ಯಾಟೊ": "tomato", "ಟೊಮೇಟೊ": "tomato",
     "coriander": "coriander", "kothamalli": "coriander", "கொத்தமல்லி": "coriander", "ಕೊತ್ತಂಬರಿ": "coriander", "ಕೊತ್ತುಂಬರಿ": "coriander",
-    "dhania": "coriander", "धनिया": "coriander", "ధనియాలు": "coriander", "?????": "coriander", "???????": "coriander", "onion": "onion", "வெங்காயம்": "onion", "प्याज": "onion", "ఉల్లి": "onion", "ಈರುಳ್ಳಿ": "onion",
-    "spinach": "spinach", "palak": "spinach", "पालक": "spinach", "పాలకూర": "spinach", "????": "spinach", "??????": "spinach", "ಮುರೈಕೀರೈ": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
-    "potato": "potato", "aloo": "potato", "आलू": "potato", "ఆలూ": "potato", "???": "potato", "???": "potato", "ಆಲೂಗಡ್ಡೆ": "potato", "உருளைக்கிழங்கு": "potato",
+    "dhania": "coriander", "धनिया": "coriander", "ధనియాలు": "coriander", "onion": "onion", "வெங்காயம்": "onion", "प्याज": "onion", "ఉల్లి": "onion", "ಈರುಳ್ಳಿ": "onion",
+    "spinach": "spinach", "palak": "spinach", "पालक": "spinach", "పాలకూర": "spinach", "ಮುರೈಕೀರೈ": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
+    "potato": "potato", "aloo": "potato", "आलू": "potato", "ఆలూ": "potato", "ಆಲೂಗಡ್ಡೆ": "potato", "உருளைக்கிழங்கு": "potato",
 }
 APPROVE_WORDS = ["sari", "seri", "saringa", "sar", "हाँ", "हां", "aam", "సరే", "sare", "சரி", "சரிங்க", "ஆம்", "ಸರಿ", "yes", "yeah", "ha", "haan", "ಹೌದು", "ok", "okay", "confirm", "ஓகே"]
 DENY_WORDS = ["illa", "இல்ல", "வேண்டாம்", "vendam", "venam", "nahi", "nahin", "नहीं", "కాదు", "లేదు", "ledu", "ಇಲ್ಲ", "ಬೇಡ", "beda", "no", "nope", "cancel", "stop"]
@@ -158,7 +174,7 @@ Q_WEATHER = ["rain", "weather", "மழை", "ಮಳೆ", "बारिश", "�
 Q_ORDERS = ["last order", "my orders", "order history", "orders", "bill", "கடந்த ஆர்டர்", "ஆர்டர் வரலாறு", "பில்", "ಹಿಂದಿನ ಆರ್ಡರ್", "ಬಿಲ್", "पिछला आर्डर", "बिल", "గత ఆర్డర్", "బిల్లు"]
 Q_SALES = ["sold", "sales", "velocity", "விற்பனை", "ಮಾರಾಟ", "बिक्री", "అమ్మకం"]
 GREETING_WORDS = ["hi", "hello", "hey", "vanakkam", "வணக்கம்", "ನಮಸ್ಕಾರ", "namaste", "नमस्ते", "నమస్కారం", "ನಮಸ್ತೆ"]
-HELP_WORDS = ["help", "menu", "உதவி", "ಸಹಾಯ", "मदद", "సహాయం"]
+HELP_WORDS = ["help", "menu", "how to do", "how to", "epdi", "eppadi", "hege", "ela", "kaise", "kese", "உதவி", "ಸಹಾಯ", "मदद", "సహాయం", "help me", "what to do"]
 
 
 def _question_kind(low: str) -> str | None:
@@ -187,8 +203,7 @@ LANG_MAP = {
 
 
 def _detect_lang(text: str) -> str:
-    # Telugu FIX 2026-09-19: \u0c00-\u0c7f was missing, so Telugu transcripts
-    # were treated as English and got Tamil asks.
+    # 1) Unicode script is authoritative — reply must be pure, never mixed.
     if re.search(r"[\u0b80-\u0bff]", text):
         return "ta"
     if re.search(r"[\u0c80-\u0cff]", text):
@@ -197,6 +212,23 @@ def _detect_lang(text: str) -> str:
         return "te"
     if re.search(r"[\u0900-\u097f]", text):
         return "hi"
+    # 2) Tanglish / code-switch: Latin-script Tamil/Hindi/etc. Common merchant
+    #    phrasing like "tomato 20kg venum", "sari", "chahiye" — without this,
+    #    they were mis-detected as English and got mixed replies.
+    low = text.lower()
+    # pure language reply: count dominant Latin keywords, pick winner
+    ta_keys = ["venum", "vendum", "vaenum", "sari", "seri", "vaanga", "kudu", "kudunga", "epdi", "enna", "vanakkam"]
+    hi_keys = ["chahiye", "bhejo", "kitna", "kya", "namaste", "sahiye", "bejna", "batao"]
+    te_keys = ["kavali", "enti", "ela", "namaste", "kavala"]
+    kn_keys = ["beku", "yenu", "yava", "namaste", "kodi"]
+    scores = {"ta": sum(1 for k in ta_keys if k in low), "hi": sum(1 for k in hi_keys if k in low),
+              "te": sum(1 for k in te_keys if k in low), "kn": sum(1 for k in kn_keys if k in low)}
+    best = max(scores, key=lambda k: scores[k])
+    if scores[best] > 0:
+        # also respect merchant's saved preference when Tanglish is ambiguous (single word)
+        # but never mix: one language per reply.
+        return best
+    # 3) No Indic signal → English
     return "en"
 
 
@@ -206,9 +238,9 @@ def _parse_quantities(text: str) -> dict[str, int | None]:
     Tamil/Kannada word-numbers, punctuation, and qty-before/after product order.
     NEVER invents a number — absent numbers stay None (engine fills deterministically).
 
-    FIX 2026-09-19: glued tokens like '20kg' / '10bunches' were single \w+ matches,
-    so 'tomato 20kg' carried NO quantity. Numbers and unit words are now split
-    apart before parsing."""
+    FIX 2026-09-19: glued tokens like '20kg' / '10bunches' were single word
+    matches, so 'tomato 20kg' carried NO quantity. Numbers and unit words are
+    now split apart before parsing."""
     # Split digits glued to unit words: '20kg' -> '20 kg', '10bunches' -> '10 bunches'
     text = re.sub(r"(\d)(kgs?|kilos?|crates?|bunches?|bunch)\b", r"\1 \2", text, flags=re.IGNORECASE)
     # Also split a Devanagari/Indic unit glued after digits: '20किलो' -> '20 किलो'
@@ -291,14 +323,28 @@ def _products_from_llm_names(names: dict | None) -> dict[str, int | None]:
 def health():
     return {
         "status": "ok",
+        "copilot_architecture": {
+            "knowledge": {
+                "name": "Sarvam AI",
+                "role": "Language understanding, intent parsing, explanation",
+                "configured": bool(os.getenv("SARVAM_API_KEY"))
+            },
+            "brain": {
+                "name": "Cognee",
+                "role": "Merchant memory, pattern recognition, historical recall",
+                "configured": cognee_client.configured()
+            },
+            "hands": {
+                "name": "n8n Automation",
+                "role": "WhatsApp messaging, UI updates, order dispatch",
+                "configured": bool(os.getenv("N8N_WEBHOOK_URL"))
+            }
+        },
         "sarvam_key": bool(os.getenv("SARVAM_API_KEY")),
         "weather_mode": os.getenv("WEATHER_MODE", "seeded"),
         "llm_mode": llm_mod.llm_mode(),
         "cognee": cognee_client.health(),
         "n8n": "configured" if os.getenv("N8N_WEBHOOK_URL") else "not_configured",
-        "twilio": "configured" if os.getenv("TWILIO_ACCOUNT_SID") else "not_configured",
-        "twilio_mode": os.getenv("TWILIO_CONTENT_MODE", "template"),
-        "twilio_recipient": os.getenv("TWILIO_WHATSAPP_TO", "NOT_SET"),
         "copilot": {
             "wa_akg": bool(os.getenv("WA_AKG_URL") and os.getenv("WA_AKG_API_KEY")
                            and os.getenv("WA_AKG_SESSION")),
@@ -322,7 +368,8 @@ def llm_diag():
 
 @app.post("/stt")
 async def speech_to_text(file: UploadFile = File(...), language_code: str = "ta-IN"):
-    """Sarvam STT (saaras:v3). Accepts wav/webm/mp3 from browser MediaRecorder."""
+    """Sarvam STT (saaras:v3). Accepts wav/webm/mp3/ogg from browser/WebChat.
+    Low-latency path: runs in bounded thread pool, max 45s timeout."""
     api_key = os.getenv("SARVAM_API_KEY")
     if not api_key:
         raise HTTPException(503, "SARVAM_API_KEY not configured — typed-transcript fallback is the labeled path")
@@ -330,15 +377,22 @@ async def speech_to_text(file: UploadFile = File(...), language_code: str = "ta-
     if not audio:
         raise HTTPException(400, "empty audio")
     try:
-        from sarvamai import SarvamAI
-        client = SarvamAI(api_subscription_key=api_key)
-        suffix = (file.filename or "audio.wav").rsplit(".", 1)[-1].lower()
-        codec = {"wav": "wav", "webm": "webm", "mp3": "mp3", "m4a": "mp4", "ogg": "ogg"}.get(suffix, "wav")
-        resp = client.speech_to_text.transcribe(
-            file=(f"audio.{suffix}", audio), model="saaras:v3",
-            language_code=language_code, input_audio_codec=codec,
-        )
-        return {"transcript": getattr(resp, "transcript", "") or str(resp), "language_code": language_code}
+        def _do_stt() -> dict:
+            from sarvamai import SarvamAI
+            client = SarvamAI(api_subscription_key=api_key)
+            suffix = (file.filename or "audio.wav").rsplit(".", 1)[-1].lower()
+            codec = {"wav": "wav", "webm": "webm", "mp3": "mp3", "m4a": "mp4", "ogg": "ogg"}.get(suffix, "wav")
+            resp = client.speech_to_text.transcribe(
+                file=(f"audio.{suffix}", audio), model="saaras:v3",
+                language_code=language_code, input_audio_codec=codec,
+            )
+            return {"transcript": getattr(resp, "transcript", "") or str(resp), "language_code": language_code}
+        # FIX 2026-09-19: the SDK call used to run directly in the route threadpool
+        # with no outer bound — a hung provider call parked a worker forever and
+        # enough of those froze the whole API. Bounded executor + hard deadline.
+        return _run_offloop(_do_stt, 45)
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(504, "STT timed out — use typed transcript (labeled fallback)")
     except Exception as e:
         raise HTTPException(502, f"STT failed: {e}")
 
@@ -467,9 +521,17 @@ def explain(payload: dict):
     if not items:
         raise HTTPException(400, "no items to explain")
     rain = get_weather()["rain_prob"]
-    text = llm_mod.explain_ask(items, rain)
+    # FIX 2026-09-19: language passthrough — a Kannada/Hindi/Telugu demo order no
+    # longer gets a Tamil Sarvam rewrite (the grounding gate would reject it
+    # anyway). Non-Tamil gets the deterministic localized ask via template_ask.
+    lang = LANG_MAP.get(str(payload.get("language") or "").strip().lower())
+    text = None
+    if lang is None or lang == "ta":
+        text = llm_mod.explain_ask(items, rain, language="Tamil")
     return {
-        "text": text or llm_mod.template_ask(items, rain),
+        "text": text or (_ask_text(items, lang) if lang in ("kn", "hi", "te", "en")
+                         else llm_mod.template_ask(items, rain)),
+        "language": lang or "ta",
         "source": "sarvam-llm" if text else "template-fallback",
         "fallback_reason": None if text else (llm_mod.LAST.get("error") or
                           "grounding gate: explanation omitted an engine quantity"),
@@ -551,6 +613,274 @@ def approve_order(order: Order):
     token = str(uuid.uuid4())
     issued_tokens[token] = {"product": order.product, "qty": order.qty, "supplier": order.supplier}
     return {"status": "approved", "approval_token": token}
+
+
+# ─── Merchant voice/text preferences (persisted locally + Cognee) ──────────
+# voice_mode: "text" | "voice" | "both"  — how the copilot replies to THIS merchant
+# language:   "ta-IN" | "hi-IN" | "te-IN" | "kn-IN" | "en-US"
+PREFS_PATH = os.path.join(BASE_DIR, "data", "merchant_prefs.json")
+DEFAULT_PREFS = {"voice_mode": "both", "language": "ta-IN"}
+
+
+def _load_prefs() -> dict:
+    try:
+        with open(PREFS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError:
+        return {}
+
+
+def _save_prefs(prefs: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(PREFS_PATH), exist_ok=True)
+        with open(PREFS_PATH, "w", encoding="utf-8") as f:
+            json.dump(prefs, f, indent=2, ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def _get_merchant_prefs(phone_digits: str) -> dict:
+    """Fast local read (no network) — the low-latency path for every reply."""
+    return _load_prefs().get(phone_digits, dict(DEFAULT_PREFS))
+
+
+def _prefs_lang(phone_digits: str) -> str:
+    """Sarvam TTS language code for this merchant's preference (default Tamil)."""
+    return _get_merchant_prefs(phone_digits).get("language", "ta-IN")
+
+
+def _set_merchant_prefs(phone_digits: str, **updates) -> dict:
+    prefs = _load_prefs()
+    cur = prefs.get(phone_digits, dict(DEFAULT_PREFS))
+    cur.update({k: v for k, v in updates.items() if v is not None})
+    prefs[phone_digits] = cur
+    _save_prefs(prefs)
+    # Fire-and-forget write to Cognee so the knowledge graph learns the choice.
+    if cognee_client.configured():
+        cognee_client.remember_async([
+            f"Merchant {phone_digits} prefers {cur['voice_mode']} replies "
+            f"in language {cur['language']}."
+        ])
+    return cur
+
+
+# ─── Merchant business profiles (first-time onboarding) ───────────────────
+# For a new merchant the copilot BECOMES a business partner: it asks name,
+# business, and what they sell, builds a knowledge card, and mirrors it to
+# Cognee so every later reply is grounded in their business.
+PROFILES_PATH = os.path.join(BASE_DIR, "data", "merchant_profiles.json")
+ONBOARD_STEPS = ["name", "business", "products"]  # 3-step interactive flow
+
+
+def _load_profiles() -> dict:
+    try:
+        with open(PROFILES_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError:
+        return {}
+
+
+def _save_profiles(profiles: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(PROFILES_PATH), exist_ok=True)
+        with open(PROFILES_PATH, "w", encoding="utf-8") as f:
+            json.dump(profiles, f, indent=2, ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def _seed_default_profile(phone_digits: str) -> dict:
+    """Seed Lakshmi (demo merchant) so existing judges don't re-onboard."""
+    profiles = _load_profiles()
+    if phone_digits in profiles:
+        return profiles[phone_digits]
+    # Only seed the known demo numbers
+    demo_seed = {
+        "917010919624": {"name": "Lakshmi", "business": "Lakshmi Kirana & Vegetables", "business_type": "kirana", "products": "tomato, onion, coriander, spinach", "location": "Basavanagudi, Bangalore", "onboarding_complete": True, "step": 3},
+        "919840306258": {"name": "Rahul", "business": "Rahul Traders", "business_type": "trader", "products": "tomato, potato", "location": "Chennai", "onboarding_complete": True, "step": 3},
+    }
+    if phone_digits in demo_seed:
+        profiles[phone_digits] = demo_seed[phone_digits]
+        _save_profiles(profiles)
+        return demo_seed[phone_digits]
+    return {}
+
+
+def _get_merchant_profile(phone_digits: str) -> dict | None:
+    profiles = _load_profiles()
+    if phone_digits not in profiles:
+        return _seed_default_profile(phone_digits) or None
+    return profiles[phone_digits]
+
+
+def _set_merchant_profile(phone_digits: str, **updates) -> dict:
+    profiles = _load_profiles()
+    cur = profiles.get(phone_digits, {"onboarding_complete": False, "step": 0})
+    cur.update({k: v for k, v in updates.items() if v is not None})
+    profiles[phone_digits] = cur
+    _save_profiles(profiles)
+    # Mirror business knowledge to Cognee causal graph
+    if cognee_client.configured() and cur.get("onboarding_complete"):
+        facts = [f"Merchant {phone_digits} is {cur.get('name','')} who runs {cur.get('business','')} ({cur.get('business_type','')}) selling {cur.get('products','')} at {cur.get('location','')}."]
+        # Also store voice/lang prefs as fact
+        prefs = _get_merchant_prefs(phone_digits)
+        facts.append(f"Merchant {phone_digits} prefers {prefs['voice_mode']} replies in {prefs['language']}.")
+        cognee_client.remember_async(facts)
+    return cur
+
+
+def _onboarding_needed(phone_digits: str) -> bool:
+    p = _get_merchant_profile(phone_digits)
+    return not p or not p.get("onboarding_complete")
+
+
+def _onboarding_prompt(step: int, lang: str, name: str = "") -> str:
+    """Interactive onboarding asks — localized, business-partner tone."""
+    prompts = {
+        0: {
+            "ta": "Vanakkam! 🙏 Naan ungala Paytm Business Partner. Ungala peyar enna? (Your name?)",
+            "hi": "Namaste! 🙏 Main aapka Paytm Business Partner hoon. Aapka naam kya hai?",
+            "te": "Namaste! 🙏 Nenu mee Paytm Business Partner. Mee peru enti?",
+            "kn": "Namaste! 🙏 Naanu nimma Paytm Business Partner. Nimma hesaru yenu?",
+            "en": "Hello! 🙏 I'm your Paytm Business Partner. What's your name?",
+        },
+        1: {
+            "ta": f"Nandri {name}! 🙏 Ungala kadai / business peyar enna? (e.g. Lakshmi Kirana)",
+            "hi": f"Shukriya {name}! 🙏 Aapki dukaan / business ka naam kya hai?",
+            "te": f"Dhanyavadalu {name}! 🙏 Mee shop / business peru enti?",
+            "kn": f"Dhanyavada {name}! 🙏 Nimma angadi / business hesaru yenu?",
+            "en": f"Thanks {name}! 🙏 What's your shop / business name?",
+        },
+        2: {
+            "ta": "Arumai! Neenga enna vikkureenga? (e.g. tomato, onion, keerai) — daily enna sell pannureenga sollunga.",
+            "hi": "Bahut badhiya! Aap kya bechte hain? (e.g. tamatar, pyaaz, dhaniya) — daily kya sell karte hain?",
+            "te": "Adbhutam! Meem emi ammutunnaru? (e.g. tomato, onion) — roju emi ammutharu cheppandi.",
+            "kn": "Tumba chennagi! Neevu yenu maartira? (e.g. tomato, onion) — dina yenu sell maadtiri heli.",
+            "en": "Great! What do you sell? (e.g. tomato, onion, coriander) — tell me your daily products.",
+        },
+    }
+    return prompts.get(step, prompts[0]).get(lang, prompts[step]["en"])
+
+
+def _onboarding_complete_msg(profile: dict, lang: str) -> str:
+    name = profile.get("name", "friend")
+    biz = profile.get("business", "your business")
+    prods = profile.get("products", "")
+    msgs = {
+        "ta": f"Arumai {name}! 🎉 {biz} pathi theriyum — neenga {prods} vikkureenga. Naan ippo ungala Business Partner! Stock kekalaam, order pannalaam, sales epdi grow pannalaam-nu ketkalaam. Voice-la pesava? 'voice mode' nu sollunga.",
+        "hi": f"Shabaash {name}! 🎉 {biz} ke baare me samajh gaya — aap {prods} bechte hain. Ab main aapka Business Partner hoon! Stock check, order, ya sales kaise badhayen — kuch bhi poochhiye. Voice chahiye to 'voice mode' boliye.",
+        "te": f"Adbhutam {name}! 🎉 {biz} gurinchi ardham ayyindi — meeru {prods} ammutunnaru. Nenu ippudu mee Business Partner! Stock, order, sales elaa penchalo adagandi.",
+        "kn": f"Adbhuta {name}! 🎉 {biz} bagge tiliyitu — neevu {prods} maarrtiri. Naanu nimma Business Partner! Stock, order, sales hege beLesabeku anta keli.",
+        "en": f"Awesome {name}! 🎉 Got it — {biz} sells {prods}. I'm now your Business Partner! Ask stock, place orders, or 'How to grow sales?' — and say 'voice mode' if you prefer voice notes.",
+    }
+    return msgs.get(lang, msgs["en"])
+
+
+def _tap_suffix(options: list[dict], channel: str) -> str:
+    """For WhatsApp (no buttons) append numbered tappable list — no typing needed."""
+    if channel != "wa-akg" or not options:
+        return ""
+    # numbered for "reply 1" support
+    picks = " | ".join(f"{i+1}. {o['label']}" for i, o in enumerate(options[:4]))
+    return f"\n\n👉 Tap: {picks}  (reply 1/2/3 or hold 🎤 mic)"
+
+
+def _choice_options(status: str, lang: str, step: int | None = None) -> list[dict]:
+    """Tap-options for low-data, no-typing UX. Every reply includes these chips.
+    Voice-first: user taps or speaks, never types if they don't want to."""
+    # labels are verbatim values sent back — pure language, no mix
+    if status == "onboarding":
+        if step == 0:
+            return [{"label": "Lakshmi", "value": "Lakshmi"}, {"label": "Rahul", "value": "Rahul"}, {"label": "Kumar", "value": "Kumar"}, {"label": "Others ✏️", "value": "Others"}]
+        if step == 1:
+            # Pre-defined shop types + Others → type
+            return [
+                {"label": "Kirana Store", "value": "Kirana Store"},
+                {"label": "Vegetable Stall", "value": "Vegetable Stall"},
+                {"label": "Tea & Snacks", "value": "Tea Snacks Stall"},
+                {"label": "General Store", "value": "General Store"},
+                {"label": "Others ✏️", "value": "Others"},
+            ]
+        if step == 2:
+            # Category-wise checklist (WhatsApp shows as tap options, UI shows as checkboxes)
+            return [
+                {"label": "🥬 Vegetables: tomato, onion, potato", "value": "tomato, onion, potato, coriander"},
+                {"label": "🛒 Kirana: rice, dal, oil, sugar", "value": "rice, dal, oil, sugar"},
+                {"label": "🍎 Fruits: banana, mango, apple", "value": "banana, mango, apple"},
+                {"label": "Others ✏️", "value": "Others"},
+            ]
+    if status == "onboarding_complete":
+        return [{"label": {"ta": "Stock paar", "hi": "Stock dekho", "en": "Check stock"} .get(lang, "Check stock"), "value": "Check stock"}, {"label": "tomato 20kg", "value": "tomato 20kg"}, {"label": {"ta": "Sales epdi?", "hi": "Sales kaise?", "en": "How to grow sales?"} .get(lang, "How to grow sales?"), "value": "How to grow sales?"}]
+    if status == "greeted":
+        return [{"label": "Check stock", "value": "Check stock"}, {"label": "tomato 20kg", "value": "tomato 20kg"}, {"label": "Why 20kg?", "value": "Why 20kg?"}]
+    if status == "awaiting_approval":
+        yes = {"ta": "சரி Yes", "hi": "हाँ Yes", "te": "సరే Yes", "kn": "ಸರಿ Yes", "en": "Yes"} .get(lang, "Yes")
+        no = {"ta": "Vendaam No", "hi": "Nahi No", "te": "Vaddu No", "kn": "Beda No", "en": "No"} .get(lang, "No")
+        return [{"label": f"✅ {yes}", "value": "yes", "primary": True}, {"label": f"✕ {no}", "value": "no"}, {"label": "+5 kg", "value": "5kg more"}, {"label": "-5 kg", "value": "5kg less"}]
+    if status == "answered":
+        return [{"label": "Order tomato", "value": "tomato 20kg"}, {"label": "Help", "value": "help"}]
+    if status == "preference_set":
+        return [{"label": "Check stock", "value": "Check stock"}, {"label": "Help", "value": "help"}]
+    return [{"label": "Help", "value": "help"}, {"label": "Check stock", "value": "Check stock"}]
+
+
+@app.post("/preferences")
+def set_preferences(payload: dict):
+    """Set merchant preferences (voice_mode, language). Persisted locally for
+    low latency and mirrored to Cognee for the knowledge graph."""
+    phone = _normalize_phone(payload.get("phone", ""))
+    if not phone:
+        raise HTTPException(400, "phone required")
+    mode = payload.get("voice_mode")
+    lang = payload.get("language")
+    if mode and mode not in ("text", "voice", "both"):
+        raise HTTPException(400, "voice_mode must be text|voice|both")
+    prefs = _set_merchant_prefs(phone, voice_mode=mode, language=lang)
+    return {"status": "saved", "preferences": prefs, "phone": phone}
+
+
+@app.get("/preferences")
+def get_preferences(phone: str = "917010919624"):
+    phone_digits = _normalize_phone(phone)
+    return {"phone": phone_digits, "preferences": _get_merchant_prefs(phone_digits)}
+
+
+@app.get("/merchant/profile")
+def get_merchant_profile(phone: str):
+    phone_digits = _normalize_phone(phone)
+    if not phone_digits:
+        raise HTTPException(400, "phone required")
+    profile = _get_merchant_profile(phone_digits)
+    prefs = _get_merchant_prefs(phone_digits)
+    return {"phone": phone_digits, "profile": profile, "preferences": prefs,
+            "onboarding_complete": bool(profile and profile.get("onboarding_complete"))}
+
+
+@app.post("/merchant/profile")
+def set_merchant_profile(payload: dict):
+    """Create/update business profile — also completes onboarding when name+business+products present."""
+    phone = _normalize_phone(payload.get("phone", ""))
+    if not phone:
+        raise HTTPException(400, "phone required")
+    updates = {k: payload.get(k) for k in ("name", "business", "business_type", "products", "location", "language") if payload.get(k)}
+    # allow explicit onboarding_complete
+    if "onboarding_complete" in payload:
+        updates["onboarding_complete"] = bool(payload["onboarding_complete"])
+    if "step" in payload:
+        updates["step"] = int(payload["step"])
+    # auto-complete if has all essentials
+    cur = _get_merchant_profile(phone) or {}
+    merged = {**cur, **updates}
+    if merged.get("name") and merged.get("business") and merged.get("products"):
+        merged["onboarding_complete"] = True
+        merged["step"] = 3
+        updates["onboarding_complete"] = True
+        updates["step"] = 3
+    profile = _set_merchant_profile(phone, **updates)
+    # also sync language to prefs if provided
+    if payload.get("language"):
+        _set_merchant_prefs(phone, language=payload["language"])
+    return {"phone": phone, "profile": profile, "onboarding_complete": bool(profile.get("onboarding_complete"))}
 
 
 def _append_memory_audit(entry: dict, memory_note: str = "") -> dict:
@@ -688,20 +1018,86 @@ def _fire_twilio(record: dict, order: dict, approval: dict) -> None:
 # battery path and NEVER sends to a real user (force_mock=True).
 pending_orders: dict[str, dict] = {}
 
+# ─── Agentic RAG: Cognee context cache ─────────────────────────────────────
+# Cognee recall is slow by nature (measured 12.3s) — it must NEVER block the
+# reply path. Pattern: background refresh warms a per-merchant context cache;
+# the copilot reads the cache (fast) and every interaction is written back to
+# the graph (remember_async) so knowledge grows with each turn.
+_COGNEE_CTX_CACHE: dict[str, dict] = {}  # phone -> {"context": str, "at": float}
+_COGNEE_CTX_TTL = 300.0  # refresh at most every 5 min per merchant
+
+
+def _cognee_refresh(phone_digits: str, query: str) -> None:
+    """Background: recall merchant context from Cognee and warm the cache."""
+    if not cognee_client.configured():
+        return
+    try:
+        res = cognee_client.recall(query)
+        if "error" in res:
+            return
+        results = res.get("results") or []
+        texts = []
+        for r in results[:3]:
+            for key in ("answer", "text", "content", "description"):
+                v = r.get(key)
+                if isinstance(v, str) and v:
+                    texts.append(v)
+                    break
+        if texts:
+            _COGNEE_CTX_CACHE[phone_digits] = {
+                "context": " | ".join(texts)[:600],
+                "at": datetime.datetime.now().timestamp(),
+            }
+    except Exception:
+        pass
+
+
+def _cognee_context(phone_digits: str) -> str:
+    """Fast cached read of the merchant's Cognee context ("" if cold/absent)."""
+    entry = _COGNEE_CTX_CACHE.get(phone_digits)
+    if not entry:
+        return ""
+    if datetime.datetime.now().timestamp() - entry["at"] > _COGNEE_CTX_TTL:
+        return ""
+    return entry["context"]
+
+# ─── Rate limit / cooldown tracking (prevents retry loops on 429 errors) ──
+_message_cooldown: dict[str, float] = {}  # phone -> timestamp until when to block
+COOLDOWN_SECONDS = 60  # block for 60 seconds after rate limit hit
+MAX_RETRIES_PER_MESSAGE = 3  # stop after 3 failed attempts
+
+
+def _check_rate_limit(phone_digits: str) -> bool:
+    """Check if phone is in rate limit cooldown. Returns True if sending should be blocked."""
+    cooldown_until = _message_cooldown.get(phone_digits, 0)
+    if cooldown_until > 0 and datetime.datetime.now().timestamp() < cooldown_until:
+        return True
+    # Clean up expired cooldowns
+    _message_cooldown.pop(phone_digits, None)
+    return False
+
+
+def _set_rate_limit_cooldown(phone_digits: str):
+    """Mark phone as rate-limited; block all outgoing messages for COOLDOWN_SECONDS."""
+    _message_cooldown[phone_digits] = datetime.datetime.now().timestamp() + COOLDOWN_SECONDS
+
 
 def _normalize_phone(phone: str) -> str:
     return re.sub(r"[^\d]", "", phone or "")
 
 
 def _allowed_copilot_phone(phone_digits: str) -> bool:
+    # Single-merchant mode for this finale (user: only 7010919624)
+    # COPILOT_ALLOWED_PHONES overrides if set; otherwise default to 917010919624.
+    # TWILIO_WHATSAPP_TO is fallback for legacy.
     if not phone_digits:
         return False
     allow = os.getenv("COPILOT_ALLOWED_PHONES", "")
     if allow:
         allowed = {_normalize_phone(p) for p in allow.split(",") if _normalize_phone(p)}
         return phone_digits in allowed
-    default = _normalize_phone(os.getenv("TWILIO_WHATSAPP_TO", ""))
-    return bool(default) and phone_digits == default
+    default = _normalize_phone(os.getenv("TWILIO_WHATSAPP_TO", "")) or "917010919624"
+    return phone_digits == default
 
 
 def _stt_media(url: str, headers: dict | None = None, content_type: str = "") -> str:
@@ -726,34 +1122,105 @@ def _stt_media(url: str, headers: dict | None = None, content_type: str = "") ->
             codec = "mp3"
         else:
             codec = "wav"
-        from sarvamai import SarvamAI
-        client = SarvamAI(api_subscription_key=api_key)
         # FIX 2026-09-19: was hardcoded ta-IN — a Kannada/Hindi voice note came
         # back garbled. saaras:v3 supports language_code="unknown" (auto-detect);
         # if the provider rejects it, fall back to the crew default ta-IN.
-        for lang_code in ("unknown", "ta-IN"):
-            try:
-                resp = client.speech_to_text.transcribe(
-                    file=(f"voice.{codec}", audio), model="saaras:v3",
-                    language_code=lang_code, input_audio_codec=codec,
-                )
-                return (getattr(resp, "transcript", "") or "").strip()
-            except Exception:
-                continue
+        def _do_wa_stt() -> str:
+            from sarvamai import SarvamAI
+            client = SarvamAI(api_subscription_key=api_key)
+            for lang_code in ("unknown", "ta-IN"):
+                try:
+                    resp = client.speech_to_text.transcribe(
+                        file=(f"voice.{codec}", audio), model="saaras:v3",
+                        language_code=lang_code, input_audio_codec=codec,
+                    )
+                    return (getattr(resp, "transcript", "") or "").strip()
+                except Exception:
+                    continue
+            return ""
+        fut = _SDK_EXECUTOR.submit(_do_wa_stt, 45)
+        return fut.result(timeout=45)
+    except concurrent.futures.TimeoutError:
         return ""
     except Exception:
         return ""
 
 
-def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
+def _run_offloop(fn, timeout_s: float):
+    """Run a blocking SDK call on a dedicated bounded executor with a hard
+    deadline. A hung provider call can then never wedge the API (demo-day
+    safety): the caller's thread waits at most `timeout_s` and recovers."""
+    return _SDK_EXECUTOR.submit(fn).result(timeout=timeout_s)
+
+
+_SDK_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="sarvam-sdk")
+
+
+def _tts_audio(text: str, lang: str = "ta-IN") -> bytes:
+    """Sarvam TTS -> raw audio bytes (bulbul:v3, kavitha). Bounded 40s like the
+    /tts route. Returns b"" on any failure so callers never block the reply."""
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key or not text:
+        return b""
+    try:
+        from sarvamai import SarvamAI
+        client = SarvamAI(api_subscription_key=api_key)
+
+        def _do() -> bytes:
+            resp = client.text_to_speech.convert(
+                text=text, language_code=lang, speaker="kavitha", model="bulbul:v3")
+            aud = resp.audios[0] if hasattr(resp, "audios") else resp
+            b64 = aud if isinstance(aud, str) else getattr(aud, "audio", "")
+            if not b64:
+                raise RuntimeError("no audio in TTS response")
+            return base64.b64decode(b64)
+
+        return _SDK_EXECUTOR.submit(_do).result(timeout=40)
+    except Exception:
+        return b""
+
+
+def _send_wa_audio(phone_digits: str, audio: bytes) -> dict:
+    """Send a voice note via WA-AKG media endpoint (type=voice → ptt:true).
+    Returns a labelled outcome; never raises."""
+    wa_url = os.getenv("WA_AKG_URL")
+    wa_key = os.getenv("WA_AKG_API_KEY")
+    wa_session = os.getenv("WA_AKG_SESSION")
+    if not (wa_url and wa_key and wa_session) or not audio:
+        return {"transport": "wa-akg-audio", "status": "skipped",
+                "reason": "not_configured_or_empty"}
+    try:
+        jid = f"{phone_digits}@s.whatsapp.net"
+        r = httpx.post(
+            f"{wa_url.rstrip('/')}/api/messages/{wa_session}/{jid}/media",
+            files={"file": ("copilot_voice.ogg", audio, "audio/ogg")},
+            data={"type": "voice", "caption": ""},
+            headers={"X-API-Key": wa_key}, timeout=15)
+        return {"transport": "wa-akg-voice", "status": r.status_code,
+                "jid": jid, "body": r.text[:120] if r.status_code >= 400 else ""}
+    except Exception as e:
+        return {"transport": "wa-akg-voice", "error": type(e).__name__}
+
+
+def _copilot_send(phone: str, text: str, force_mock: bool = False,
+                  voice_mode: str | None = None) -> dict:
     """Outbound copilot reply. Priority: WA-AKG -> Twilio freeform -> mock log.
-    Every outcome is labelled so a judge can see exactly which transport ran."""
+    Every outcome is labelled so a judge can see exactly which transport ran.
+    RATE LIMIT FIX: Blocks sending for 60s after 429 to prevent retry loops."""
     phone_digits = _normalize_phone(phone)
     attempts: list[dict] = []
-    if not force_mock:
+    # Check rate limit / cooldown BEFORE attempting to send
+    if _check_rate_limit(phone_digits) and not force_mock:
+        attempts.append({"transport": "blocked", "reason": "rate_limit_cooldown"})
+        return {"transport": "blocked", "reason": "rate_limit_cooldown", "attempts": attempts}
+    # Voice-only merchants (can't read/write): skip the text bubble entirely.
+    send_text = voice_mode != "voice"
+    out = None
+    if not force_mock and send_text:
         # FIX 2026-09-19: the old code RETURNED on WA-AKG failure, so a gateway
         # hiccup silently ate the merchant's reply. Now every live transport is
         # tried in priority order and the reply is never lost.
+        # Voice is queued async after success so webhook returns <1s.
         wa_url = os.getenv("WA_AKG_URL")
         wa_key = os.getenv("WA_AKG_API_KEY")
         wa_session = os.getenv("WA_AKG_SESSION")
@@ -765,34 +1232,83 @@ def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
                     json={"message": {"text": text}},
                     headers={"X-API-Key": wa_key}, timeout=10)
                 attempts.append({"transport": "wa-akg", "status": r.status_code, "jid": jid})
+                if r.status_code == 429:  # RATE LIMIT HIT - set cooldown
+                    _set_rate_limit_cooldown(phone_digits)
+                    return {"transport": "wa-akg", "status": 429, "reason": "rate_limit", "attempts": attempts}
                 if 200 <= r.status_code < 300:
-                    return {**attempts[-1], "attempts": attempts}
+                    out = {**attempts[-1], "attempts": attempts}
+                elif r.status_code >= 400:
+                    attempts.append({"transport": "wa-akg", "status": r.status_code, "body": r.text[:200]})
             except Exception as e:
                 attempts.append({"transport": "wa-akg", "error": type(e).__name__})
-        tw_sid, tw_tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
-        if tw_sid and tw_tok:
-            try:
-                auth = base64.b64encode(f"{tw_sid}:{tw_tok}".encode()).decode()
-                r = httpx.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{tw_sid}/Messages.json",
-                    data={"To": f"whatsapp:+{phone_digits}",
-                          "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
-                          "Body": text},
-                    headers={"Authorization": f"Basic {auth}"}, timeout=10)
-                attempts.append({"transport": "twilio-freeform", "status": r.status_code})
-                if 200 <= r.status_code < 300:
-                    return {**attempts[-1], "attempts": attempts}
-            except Exception as e:
-                attempts.append({"transport": "twilio-freeform", "error": type(e).__name__})
+        # Only try Twilio if WA-AKG didn't already succeed
+        if out is None or not (200 <= out.get("status", 0) < 300):
+            tw_sid, tw_tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
+            if tw_sid and tw_tok:
+                try:
+                    auth = base64.b64encode(f"{tw_sid}:{tw_tok}".encode()).decode()
+                    r = httpx.post(
+                        f"https://api.twilio.com/2010-04-01/Accounts/{tw_sid}/Messages.json",
+                        data={"To": f"whatsapp:+{phone_digits}",
+                              "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
+                              "Body": text},
+                        headers={"Authorization": f"Basic {auth}"}, timeout=10)
+                    attempts.append({"transport": "twilio-freeform", "status": r.status_code})
+                    if r.status_code == 429:  # RATE LIMIT HIT - set cooldown
+                        _set_rate_limit_cooldown(phone_digits)
+                        return {"transport": "twilio-freeform", "status": 429, "reason": "rate_limit", "attempts": attempts}
+                    if 200 <= r.status_code < 300:
+                        out = {**attempts[-1], "attempts": attempts}
+                    elif r.status_code >= 400:
+                        attempts.append({"transport": "twilio-freeform", "status": r.status_code, "body": r.text[:200]})
+                    else:
+                        out = {**attempts[-1], "attempts": attempts}
+                except Exception as e:
+                    if "rate_limit" not in str(e):
+                        attempts.append({"transport": "twilio-freeform", "error": type(e).__name__})
+        if out is not None and 200 <= out.get("status", 0) < 300:
+            # Text delivered live — queue voice async (never blocks) then return
+            if voice_mode in ("voice", "both"):
+                lang = _prefs_lang(phone_digits)
+                def _voice_job_live(txt=text, lg=lang, ph=phone_digits):
+                    audio = _tts_audio(txt, lg)
+                    if audio:
+                        _send_wa_audio(ph, audio)
+                threading.Thread(target=_voice_job_live, daemon=True, name="wa-voice-live").start()
+                out["voice"] = {"transport": "wa-akg-audio", "status": "queued",
+                                "note": "voice note queued (live text succeeded, TTS async)"}
+            return out
+    # Fallback: mock-log (simulate channel or live delivery failed)
     try:
         os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
         with open(os.path.join(BASE_DIR, "data", "copilot_chat.log"), "a",
                   encoding="utf-8") as lf:
             lf.write(f"{datetime.datetime.now().isoformat(timespec='seconds')} | "
                      f"To: {phone_digits} | {text}\n")
-        return {"transport": "mock-log", "status": "logged"}
+        out = {"transport": "mock-log", "status": "logged"}
+        if attempts:
+            out["attempts"] = attempts
     except OSError:
-        return {"transport": "none", "error": "log unavailable"}
+        out = {"transport": "none", "error": "log unavailable"}
+    # ── Voice delivery: TTS -> WA-AKG audio note ────────────────────────────
+    # Low-latency rule: voice NEVER blocks the text reply. Text is sent (or
+    # logged) above; voice is fire-and-forget in a daemon thread so the
+    # webhook always returns in <1s even when TTS takes 10-40s.
+    if voice_mode in ("voice", "both") and not force_mock:
+        lang = _prefs_lang(phone_digits)
+
+        def _voice_job():
+            audio = _tts_audio(text, lang)
+            if audio:
+                _send_wa_audio(phone_digits, audio)
+
+        threading.Thread(target=_voice_job, daemon=True, name="wa-voice").start()
+        out["voice"] = {"transport": "wa-akg-audio", "status": "queued",
+                        "note": "voice note queued (TTS async, non-blocking)"}
+    elif voice_mode in ("voice", "both") and force_mock:
+        out["voice"] = {"transport": "mock-log", "status": "logged",
+                        "note": "voice note simulated (offline battery path)"}
+    return out
 
 
 def _approve_and_dispatch(phone_digits: str, pend: dict) -> list[dict]:
@@ -868,8 +1384,11 @@ def _catalog_product_in(low: str) -> str | None:
 
 
 def _loc_name(data: dict, product: str, lang: str) -> str:
-    """Localized product name; falls back to Tamil then the catalog key."""
+    """Localized product name: native script for kn/hi/te, the catalog key for
+    English, Tamil name otherwise. Falls back to the catalog key last."""
     key = {"kn": "name_kn", "hi": "name_hi", "te": "name_te"}.get(lang)
+    if lang == "en":
+        return product
     return (data.get(key) if key else None) or data.get("name_tn") or product
 
 
@@ -885,19 +1404,14 @@ def _get_pending(phone_digits: str) -> dict | None:
 
 
 def _help_text(lang: str) -> str:
-    return {
+    t = {
         "ta": "HarvestWise உதவி:\n• ஆர்டர்: \"நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி\"\n• சரி = ஒப்புதல் · இல்ல/வேண்டாம் = ரத்து\n• கேளுங்கள்: விலை? எவ்வளவு சரக்கு? மழை? ஏன் 20? கடந்த ஆர்டர்?",
         "kn": "HarvestWise ಸಹಾಯ:\n• ಆರ್ಡರ್: \"ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ\"\n• ಸರಿ = ಒಪ್ಪಿಗೆ · ಬೇಡ/ಇಲ್ಲ = ರದ್ದು\n• ಕೇಳಿ: ಬೆಲೆ? ಎಷ್ಟು ದಾಸ್ತಾನು? ಮಳೆ? ಏಕೆ 20? ಹಿಂದಿನ ಆರ್ಡರ್?",
         "hi": "HarvestWise मदद:\n• ऑर्डर: \"कल 20 किलो टमाटर, 10 गुच्छा धनिया\"\n• हाँ = स्वीकृति · नहीं = रद्द\n• पूछें: दाम? कितना स्टॉक? बारिश? क्यों 20? पिछला ऑर्डर?",
         "te": "HarvestWise సహాయం:\n• ఆర్డర్: \"రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు\"\n• సరే = ఆమోదం · కాదు/లేదు = రద్దు\n• అడగండి: ధర? ఎంత స్టాక్? వర్షం? ఎందుకు 20? గత ఆర్డర్?",
         "en": "HarvestWise help:\n• Order: \"tomato 20kg, 10 bunches coriander\"\n• yes/ok = approve · no/cancel = cancel\n• Ask: price? stock? rain? why 20? last orders?",
-    }.get(lang) or _help_text("en") if False else {
-        "ta": "HarvestWise உதவி:\n• ஆர்டர்: \"நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி\"\n• சரி = ஒப்புதல் · இல்ல/வேண்டாம் = ரத்து\n• கேளுங்கள்: விலை? எவ்வளவு சரக்கு? மழை? ஏன் 20? கடந்த ஆர்டர்?",
-        "kn": "HarvestWise ಸಹಾಯ:\n• ಆರ್ಡರ್: \"ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ\"\n• ಸರಿ = ಒಪ್ಪಿಗೆ · ಬೇಡ/ಇಲ್ಲ = ರದ್ದು\n• ಕೇಳಿ: ಬೆಲೆ? ಎಷ್ಟು ದಾಸ್ತಾನು? ಮಳೆ? ಏಕೆ 20? ಹಿಂದಿನ ಆರ್ಡರ್?",
-        "hi": "HarvestWise मदद:\n• ऑर्डर: \"कल 20 किलो टमाटर, 10 गुच्छा धनिया\"\n• हाँ = स्वीकृति · नहीं = रद्द\n• पूछें: दाम? कितना स्टॉक? बारिश? क्यों 20? पिछला ऑर्डर?",
-        "te": "HarvestWise సహాయం:\n• ఆర్డర్: \"రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు\"\n• సరే = ఆమోదం · కాదు/లేదు = రద్దు\n• అడగండి: ధర? ఎంత స్టాక్? వర్షం? ఎందుకు 20? గత ఆర్డర్?",
-        "en": "HarvestWise help:\n• Order: \"tomato 20kg, 10 bunches coriander\"\n• yes/ok = approve · no/cancel = cancel\n• Ask: price? stock? rain? why 20? last orders?",
-    }[lang]
+    }
+    return t.get(lang) or t["en"]
 
 
 def _welcome_text(lang: str) -> str:
@@ -907,7 +1421,88 @@ def _welcome_text(lang: str) -> str:
         "hi": "नमस्ते लक्ष्मी! HarvestWise आपका रीस्टॉक सहायक है। ऑर्डर बताइए या 'मदद' कहिए।",
         "te": "నమస్కారం లక్ష్మీ! HarvestWise మీ రీస్టాక్ సహాయకుడు. ఆర్డర్ చెప్పండి లేదా 'సహాయం' అని అడగండి.",
         "en": "Vanakkam Lakshmi! HarvestWise is your restocking copilot. Say an order, or ask for help.",
-    }[lang]
+    }.get(lang) or _welcome_text("en")
+
+
+CONFIRM_SUFFIX = {
+    "ta": "\nசரி என்று பதிலளிக்கவும் (reply \"சரி\" to confirm).",
+    "kn": "\n\"ಸರಿ\" ಎಂದು ಉತ್ತರಿಸಿ (reply ಸರಿ to confirm).",
+    "hi": "\n\"हाँ\" या \"sari\" से उत्तर दें (reply to confirm).",
+    "te": "\n\"సరే\" అని స్పందించండి (reply సరే to confirm).",
+    "en": "\nReply yes (சரி) to confirm.",
+}
+
+MAX_ORDER_CAP = 100  # mirrors MAX_ORDER in the engine
+
+
+def _cancel_text(lang: str) -> str:
+    return {
+        "ta": "HarvestWise: ஆர்டர் ரத்து செய்யப்பட்டது. எப்போது வேண்டுமானாலும் சொல்லுங்கள்.",
+        "kn": "HarvestWise: ಆರ್ಡರ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ. ಬೇಕಾದಾಗ ಹೇಳಿ.",
+        "hi": "HarvestWise: ऑर्डर रद्द कर दिया गया। जब चाहें बताइए।",
+        "te": "HarvestWise: ఆర్డర్ రద్దు చేయబడింది. కావాలన్నప్పుడు చెప్పండి.",
+        "en": "HarvestWise: order cancelled. Tell me what you need anytime.",
+    }.get(lang) or _cancel_text("en")
+
+
+def _no_pending_text(lang: str) -> str:
+    return {
+        "ta": "HarvestWise: ஒப்புதலுக்கான ஆர்டர் இல்லை. முதலில் ஆர்டர் சொல்லுங்கள்.",
+        "kn": "HarvestWise: ಒಪ್ಪಿಗೆಗೆ ಆರ್ಡರ್ ಇಲ್ಲ. ಮೊದಲು ಆರ್ಡರ್ ಹೇಳಿ.",
+        "hi": "HarvestWise: अनुमोदन के लिए कोई ऑर्डर नहीं। पहले ऑर्डर बताइए।",
+        "te": "HarvestWise: ఆమోదించడానికి ఆర్డర్ లేదు. మొదట ఆర్డర్ చెప్పండి.",
+        "en": "HarvestWise: no pending order to approve. Send your order first.",
+    }.get(lang) or _no_pending_text("en")
+
+
+def _fallback_text(lang: str) -> str:
+    return {
+        "ta": "HarvestWise: பொருள் புரியவில்லை. முயற்சிக்கவும்: நாளை 20 கிலோ தக்காளி (அல்லது 'உதவி').",
+        "kn": "HarvestWise: ಅರ್ಥವಾಗಲಿಲ್ಲ. ಪ್ರಯತ್ನಿಸಿ: ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ (ಅಥವಾ 'ಸಹಾಯ').",
+        "hi": "HarvestWise: समझ नहीं आया। आज़माएँ: कल 20 किलो टमाटर (या 'मदद').",
+        "te": "HarvestWise: అర్థం కాలేదు. ప్రయత్నించండి: రేపు 20 కిలో టమాటా (లేదా 'సహాయం').",
+        "en": "HarvestWise: I did not catch a product. Try: tomato 20kg (or 'help').",
+    }.get(lang) or _fallback_text("en")
+
+
+def _ask_text(items: list[dict], lang: str) -> str:
+    """Deterministic multilingual ask — every quantity from the engine, verbatim."""
+    unit_word = {
+        "ta": {"kg": "கிலோ", "bunch": "கொத்து"},
+        "kn": {"kg": "ಕಿಲೋ", "bunch": "ಗೊಂಚಲು"},
+        "hi": {"kg": "किलो", "bunch": "गुच्छा"},
+        "te": {"kg": "కిలో", "bunch": "కట్ట"},
+        "en": {"kg": "kg", "bunch": "bunches"},
+    }
+    rain = int(round(get_weather()["rain_prob"] * 100))
+    tomorrow = {"ta": "நாளை", "kn": "ನಾಳೆ", "hi": "कल", "te": "రేపు", "en": "Tomorrow"}[lang]
+    rainword = {"ta": "மழை", "kn": "ಮಳೆ", "hi": "बारिश", "te": "వర్షం", "en": "rain"}[lang]
+    uw = unit_word[lang]
+    parts = ", ".join(
+        f"{i['recommended_qty']} {uw.get(i['unit'], i['unit'])} {_loc_name(CATALOG[MERCHANT][i['product']], i['product'], lang)}"
+        for i in items
+    )
+    want = {"ta": " வேண்டுமா?", "kn": " ಬೇಕೆ?", "hi": " चाहिए?", "te": " కావాలా?", "en": "?"}[lang]
+    return f"{tomorrow} {rainword} {rain}%. {tomorrow} {parts}{want}"
+
+
+def _parse_adjustment(low: str) -> dict | None:
+    """Detect 'add/remove N unit product' adjustments to the pending basket.
+    Returns {'product': str, 'delta': int} or None. Numbers come ONLY from her
+    speech — never invented. English only for now (Tamil words are ambiguous
+    with wordnums); the rules parser still handles full re-orders in all langs."""
+    more = _word_hit(low, ["more", "add", "extra", "increase"])
+    less = _word_hit(low, ["less", "reduce", "decrease", "remove"])
+    if not (more or less):
+        return None
+    m = re.search(r"\b(\d{1,3})\b", low)
+    if not m:
+        return None
+    n = int(m.group(1))
+    product = _catalog_product_in(low)
+    if not product or n <= 0 or n > 90:
+        return None
+    return {"product": product, "delta": n if more else -n}
 
 
 def _qa_answer(kind: str, low: str, lang: str) -> str:
@@ -990,6 +1585,56 @@ def _qa_answer(kind: str, low: str, lang: str) -> str:
     return _help_text(lang)
 
 
+def _growth_answer(lang: str) -> str:
+    """AI Partner growth predictions: forecast + bundle + margin — pure language, no mix."""
+    fc = get_sales_forecast(MERCHANT)
+    bundle = get_bundle_suggestion("tomato")
+    leader = get_margin_leader(MERCHANT)
+    # pure language templates
+    if lang == "ta":
+        lines = [
+            f"📈 Forecast: {fc['reason']} → lift {fc['lift']:.1f}x",
+            f"💡 Bundle: {bundle['why']} — {bundle['with']} {bundle['qty']} bunch add pannalaama?",
+            f"💰 Margin leader: {leader['name_tn']} (₹{leader['price']} × {leader['velocity']}/d)",
+            "Tap 1: Check stock  2: tomato 20kg  3: Order bundle",
+        ]
+        return "\n".join(lines)
+    if lang == "hi":
+        lines = [
+            f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x",
+            f"💡 Bundle: {bundle['why']} — {bundle['with']} {bundle['qty']} जोड़ें?",
+            f"💰 Best margin: {leader['product']} (₹{leader['price']} × {leader['velocity']}/d)",
+            "Tap: 1 Check stock  2 tomato 20kg",
+        ]
+        return "\n".join(lines)
+    # en/te/kn fallback
+    return (
+        f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x\n"
+        f"💡 Bundle: {bundle['why']} — add {bundle['with']} {bundle['qty']}?\n"
+        f"💰 Margin leader: {leader['product']} (₹{leader['price']} × {leader['velocity']}/d)\n"
+        "Tap: 1 Check stock  2 tomato 20kg"
+    )
+
+
+VOICE_CMD_WORDS = {
+    "voice": ["voice mode", "voice messages", "voice only", "speak", "ஒலி", "ஆவாஸ்",
+              "आवाज", "వాయిస్", "ಧ್ವನಿ", "voice"],
+    "text": ["text mode", "text only", "message only", "உரை", "टेक्स्ट", "టెక్స్ట్",
+             "ಪಠ್ಯ", "text"],
+    "both": ["both mode", "both", "voice and text", "இரண்டும்", "दोनों", "రెండూ",
+             "ಎರಡೂ"],
+}
+
+
+def _voice_command(low: str) -> str | None:
+    """Detect a voice/text/both preference command. Returns the mode or None."""
+    for mode, words in VOICE_CMD_WORDS.items():
+        for w in words:
+            if w in low:
+                return mode
+    return None
+
+
 def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
                              media_headers: dict | None = None,
                              content_type: str = "", channel: str = "webhook") -> dict:
@@ -1000,9 +1645,17 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
     """
     phone_digits = _normalize_phone(phone)
     force_mock = channel == "simulate"
+    vmode = _get_merchant_prefs(phone_digits)["voice_mode"]
+    # ── First-time Business Partner onboarding (name → business → products) ──
+    # If no profile, the copilot becomes an interactive partner and LEARNS the
+    # business before any order. This builds the BMC "Customer Segments" &
+    # "Key Partners" knowledge and mirrors to Cognee.
+    is_new = _onboarding_needed(phone_digits)
+    # Single-merchant lock: only 917010919624 is the merchant.
+    # Unknown callers are refused (no onboarding for others in this demo).
     if not _allowed_copilot_phone(phone_digits):
         _copilot_send(phone_digits, "HarvestWise: unknown caller - order ignored.",
-                      force_mock=force_mock)
+                      force_mock=force_mock, voice_mode=vmode)
         return {"status": "unknown_caller", "phone": phone_digits, "channel": channel}
 
     transcript = (text or "").strip()
@@ -1010,89 +1663,245 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         transcript = _stt_media(media_url, media_headers, content_type)
 
     low = transcript.lower()
+
+    # ── Onboarding state machine (interactive Business Partner) ──
+    if is_new:
+        lang = _detect_lang(transcript or "hi")
+        prof = _get_merchant_profile(phone_digits) or {}
+        step = int(prof.get("step", 0))
+        # WhatsApp numeric tap: "1","2","3" → map to option value (no typing)
+        if transcript.strip() in ("1", "2", "3", "4", "5"):
+            try:
+                idx = int(transcript.strip()) - 1
+                opts = _choice_options("onboarding", lang, step)
+                if 0 <= idx < len(opts):
+                    transcript = opts[idx]["value"]
+                    low = transcript.lower()
+            except Exception:
+                pass
+        # Empty transcript on first webhook (e.g. media-only) → ask step 0
+        if not transcript:
+            prompt = _onboarding_prompt(0, lang)
+            opts0 = _choice_options("onboarding", lang, 0)
+            send = _copilot_send(phone_digits, prompt + _tap_suffix(opts0, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "onboarding", "step": 0, "reply": prompt, "send": send,
+                    "options": _choice_options("onboarding", lang, 0),
+                    "phone": phone_digits, "channel": channel}
+        if step == 0:
+            # Greeting like "hi" is NOT a name — ask name without consuming it
+            if _word_hit(low, GREETING_WORDS) or low.strip() in ("hi", "hello", "hey", "hii", "helo"):
+                prompt = _onboarding_prompt(0, lang)
+                send = _copilot_send(phone_digits, prompt, force_mock=force_mock, voice_mode=vmode)
+                return {"status": "onboarding", "step": 0, "reply": prompt, "send": send,
+                        "options": _choice_options("onboarding", lang, 0),
+                        "phone": phone_digits, "transcript": transcript, "channel": channel}
+            if transcript.strip().lower() == "others":
+                prompt = {"ta": "Dayavu seithu ungala peyarai type pannunga.", "hi": "Kripya apna naam type karein.", "te": "Dayachesi mee peru type cheyyandi.", "kn": "Dayavittu nimma hesarannu type maadi.", "en": "Please type your name."}.get(lang, "Please type your name.")
+                send = _copilot_send(phone_digits, prompt, force_mock=force_mock, voice_mode=vmode)
+                return {"status": "onboarding", "step": 0, "reply": prompt, "send": send,
+                        "options": [], "phone": phone_digits, "transcript": transcript, "channel": channel}
+            # transcript is the NAME
+            name = transcript.strip()[:60] or "friend"
+            _set_merchant_profile(phone_digits, name=name, step=1)
+            prompt = _onboarding_prompt(1, lang, name=name)
+            opts1 = _choice_options("onboarding", lang, 1)
+            send = _copilot_send(phone_digits, prompt + _tap_suffix(opts1, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "onboarding", "step": 1, "reply": prompt, "send": send,
+                    "options": _choice_options("onboarding", lang, 1),
+                    "phone": phone_digits, "transcript": transcript, "channel": channel}
+        elif step == 1:
+            business = transcript.strip()[:80] or "my shop"
+            if business.lower() == "others":
+                prompt = {"ta": "Dayavu seithu ungala kadai peyarai type pannunga.", "hi": "Kripya apni dukaan ka naam type karein.", "te": "Dayachesi mee shop peru type cheyyandi.", "kn": "Dayavittu nimma angadi hesarannu type maadi.", "en": "Please type your shop / business name."}.get(lang, "Please type your shop / business name.")
+                send = _copilot_send(phone_digits, prompt, force_mock=force_mock, voice_mode=vmode)
+                return {"status": "onboarding", "step": 1, "reply": prompt, "send": send,
+                        "options": [], "phone": phone_digits, "transcript": transcript, "channel": channel}
+            # guess type from keywords
+            btype = "kirana"
+            lowb = business.lower()
+            if any(k in lowb for k in ["hotel", "restaurant", "cafe"]):
+                btype = "restaurant"
+            elif any(k in lowb for k in ["trader", "wholesale"]):
+                btype = "trader"
+            _set_merchant_profile(phone_digits, business=business, business_type=btype, step=2)
+            name = prof.get("name", "")
+            prompt = _onboarding_prompt(2, lang, name=name)
+            opts2 = _choice_options("onboarding", lang, 2)
+            send = _copilot_send(phone_digits, prompt + _tap_suffix(opts2, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "onboarding", "step": 2, "reply": prompt, "send": send,
+                    "options": _choice_options("onboarding", lang, 2),
+                    "phone": phone_digits, "transcript": transcript, "channel": channel}
+        elif step == 2:
+            if transcript.strip().lower() == "others":
+                prompt = {"ta": "Neenga vikkum porutkalai type pannunga (e.g. tomato, onion).", "hi": "Aap kya bechte hain, type karein (e.g. tamatar, pyaaz).", "te": "Meeru amme vasthuvulanu type cheyyandi.", "kn": "Neenu maartiruva vasthugalannu type maadi.", "en": "Please type what you sell (e.g. tomato, onion, coriander)."}.get(lang, "Please type what you sell.")
+                send = _copilot_send(phone_digits, prompt, force_mock=force_mock, voice_mode=vmode)
+                return {"status": "onboarding", "step": 2, "reply": prompt, "send": send,
+                        "options": [], "phone": phone_digits, "transcript": transcript, "channel": channel}
+            products = transcript.strip()[:120] or "tomato, onion"
+            profile = _set_merchant_profile(phone_digits, products=products, onboarding_complete=True, step=3)
+            # also show we learned voice pref
+            prompt = _onboarding_complete_msg(profile, lang)
+            optsC = _choice_options("onboarding_complete", lang)
+            send = _copilot_send(phone_digits, prompt + _tap_suffix(optsC, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "onboarding_complete", "reply": prompt, "send": send,
+                    "options": _choice_options("onboarding_complete", lang),
+                    "profile": profile, "phone": phone_digits, "transcript": transcript, "channel": channel}
     tokens = set(re.findall(r"[\w\u0b80-\u0bff\u0c80-\u0cff\u0c00-\u0c7f\u0900-\u097f]+", low))
     if any(m in low for m in INJECTION_MARKERS):
         _copilot_send(phone_digits,
                       "HarvestWise: speech refused - embedded instructions were ignored.",
-                      force_mock=force_mock)
-        return {"status": "injection_blocked", "phone": phone_digits,
+                      force_mock=force_mock, voice_mode=vmode)
+        return {"status": "injection_blocked", "options": _choice_options("answered", _detect_lang(transcript or "en")), "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
+
+    # ── Agentic RAG: learn this turn (fire-and-forget) + warm context for next ──
+    if transcript:
+        cognee_client.remember_async([
+            f"Merchant {phone_digits} asked: {transcript[:300]}"
+        ])
+        threading.Thread(
+            target=_cognee_refresh, args=(phone_digits, transcript[:200]),
+            daemon=True, name="cognee-ctx").start()
+    ctx = _cognee_context(phone_digits)
+
+    # ── WhatsApp tap: "1"/"2"/"3" → first/second/third chip (no typing) ──
+    if transcript.strip() in ("1", "2", "3", "4"):
+        pend_tmp = _get_pending(phone_digits)
+        if pend_tmp:
+            _map = {"1": "yes", "2": "no", "3": "5kg more", "4": "5kg less"}
+            transcript = _map.get(transcript.strip(), transcript)
+            low = transcript.lower()
+        elif not is_new:  # greeted/help fallback
+            _map2 = {"1": "Check stock", "2": "tomato 20kg", "3": "Why 20kg?", "4": "help"}
+            if transcript.strip() in _map2:
+                transcript = _map2[transcript.strip()]
+                low = transcript.lower()
+
+    # ── Voice/text preference command (e.g. "voice mode", "text only") ──
+    vcmd = _voice_command(low)
+    if vcmd:
+        prefs = _set_merchant_prefs(phone_digits, voice_mode=vcmd)
+        lang = _detect_lang(transcript or "ok")
+        mode_label = {"voice": "voice", "text": "text", "both": "voice + text"}[vcmd]
+        replies = {
+            "ta": f"சரி! இனி பதில்கள் {mode_label} முறையில் வரும்.",
+            "hi": f"ठीक है! अब जवाब {mode_label} में आएंगे।",
+            "te": f"సరే! ఇకపై సమాధానాలు {mode_label} రూపంలో వస్తాయి.",
+            "kn": f"ಸರಿ! ಇನ್ನು ಉತ್ತರಗಳು {mode_label} ರೂಪದಲ್ಲಿ ಬರುತ್ತವೆ.",
+            "en": f"Done! Replies will now come as {mode_label}.",
+        }
+        reply = replies.get(lang, replies["en"])
+        send = _copilot_send(phone_digits, reply, force_mock=force_mock,
+                             voice_mode=vcmd)
+        return {"status": "preference_set", "voice_mode": vcmd, "reply": reply,
+                "options": _choice_options("preference_set", lang),
+                "send": send, "phone": phone_digits, "transcript": transcript,
+                "channel": channel}
 
     if _word_hit(low, DENY_WORDS):
         pending_orders.pop(phone_digits, None)
-        _copilot_send(phone_digits,
-                      _cancel_text(_detect_lang(transcript or "no")), force_mock=force_mock)
-        return {"status": "declined", "phone": phone_digits,
+        reply = _cancel_text(_detect_lang(transcript or "no"))
+        _copilot_send(phone_digits, reply, force_mock=force_mock, voice_mode=vmode)
+        return {"status": "declined", "reply": reply, "options": _choice_options("greeted", _detect_lang(transcript or "en")), "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
 
     if _word_hit(low, APPROVE_WORDS):
-        pend = pending_orders.pop(phone_digits, None)
+        pend = _get_pending(phone_digits)
+        if pend:
+            pending_orders.pop(phone_digits, None)
         if not pend:
-            _copilot_send(phone_digits,
-                          "HarvestWise: no pending order to approve. Send your order first.",
-                          force_mock=force_mock)
-            return {"status": "no_pending", "phone": phone_digits,
+            lang0 = _detect_lang(transcript or "ok")
+            reply0 = _no_pending_text(lang0)
+            opts0 = _choice_options("greeted", lang0)
+            send0 = _copilot_send(phone_digits, reply0 + _tap_suffix(opts0, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "no_pending", "reply": reply0, "options": opts0, "send": send0, "phone": phone_digits,
                     "transcript": transcript, "channel": channel}
         results = _approve_and_dispatch(phone_digits, pend)
-        confirm = _confirm_text(results)
-        _copilot_send(phone_digits, confirm, force_mock=force_mock)
+        confirm = _confirm_text(results, _detect_lang(transcript))
+        send = _copilot_send(phone_digits, confirm, force_mock=force_mock, voice_mode=vmode)
         rejected = [r for r in results if r.get("status") != "dispatched"]
         return {"status": "dispatched" if not rejected else "partial",
+                "options": _choice_options("awaiting_approval" if not rejected else "greeted", _detect_lang(transcript)),
                 "phone": phone_digits, "transcript": transcript,
                 "dispatched": [r for r in results if r.get("status") == "dispatched"],
-                "rejected": rejected, "confirm": confirm, "channel": channel}
+                "rejected": rejected, "confirm": confirm, "reply": confirm,
+                "send": send, "channel": channel}
 
-    # --- Best-response: Why / Stock / Memory (grounded, Sarvam + Cognee, never hardcoded) ---
-    low_why = low
-    if any(m in low_why for m in ["why", "etharku", "ethukku", "karanam", "kaaranam", "reason", "explain", "stock", "inventory", "memory", "recall", "enna", "edhukku", "vilakam"]):
-        # Try to answer about current recommendation or stock, grounded on engine + Cognee
-        prod_in_why = None
-        for w, p in PRODUCT_WORDS.items():
-            if w in low_why:
-                prod_in_why = p
-                break
-        if prod_in_why or any(w in low_why for w in ["stock", "inventory"]):
-            # Stock snapshot without product → return all stocks (deterministic, not hardcoded)
-            if any(w in low_why for w in ["stock", "inventory"]) and not prod_in_why:
-                snap = stock_snapshot(MERCHANT)
-                lines = [f"{p}: {qty} {CATALOG[MERCHANT][p]['unit']}" for p, qty in snap.items()]
-                answer = "Stock now — " + " · ".join(lines) + "."
-                _copilot_send(phone_digits, answer, force_mock=force_mock)
-                return {"status": "answered", "phone": phone_digits, "transcript": transcript, "answer": answer, "channel": channel, "engine": "stock_snapshot"}
-            try:
-                target = prod_in_why or "tomato"
-                rec = recommendation(MERCHANT, target, None)
-                weather = get_weather()
-                observations = [
-                    {"tool": "get_stock", "args": target, "result": f"{rec['stock_on_hand']} {rec['unit']}"},
-                    {"tool": "get_sales_velocity", "args": target, "result": f"{CATALOG[MERCHANT][target]['velocity']} {rec['unit']}/day"},
-                    {"tool": "get_weather", "args": "tomorrow", "result": f"{int(weather['rain_prob']*100)}% rain ({weather.get('source')})"},
-                    {"tool": "get_recommendation", "args": target, "result": f"{rec['recommended_qty']} {rec['unit']} = Rs.{rec['total_inr']}"},
-                ]
-                reason_out = llm_mod.reason(rec, observations, language="Tamil", profile="fast")
-                cog = cognee_client.recall(f"Why did HarvestWise recommend {rec['recommended_qty']} {rec['unit']} {target} for Lakshmi?", dataset="harvestwise") if cognee_client.configured() else {"error": "cognee not configured"}
-                reasoning = (reason_out or {}).get("reasoning") if reason_out else None
-                if not reasoning:
-                    reasoning = f"Engine: stock {rec['stock_on_hand']} {rec['unit']}, velocity {CATALOG[MERCHANT][target]['velocity']}/day, rain {int(weather['rain_prob']*100)}% -> {rec['recommended_qty']} {rec['unit']} (Rs.{rec['total_inr']})."
-                cog_text = ""
-                if cog.get("results"):
-                    cog_text = " · ".join([str(x.get("text") or x.get("content") or "")[:120] for x in cog["results"][:1] if x.get("text") or x.get("content")])
-                answer = reasoning
-                if cog_text:
-                    answer += f"\n\nMemory: {cog_text[:180]}"
-                answer += f"\n\nStock now: {rec['stock_on_hand']} {rec['unit']} on hand."
-                _copilot_send(phone_digits, answer, force_mock=force_mock)
-                return {"status": "answered", "phone": phone_digits, "transcript": transcript, "product": target, "answer": answer, "channel": channel, "engine": "reason+cognee"}
-            except Exception:
-                pass
+    # --- Growth AI Partner: forecast + bundle + margin (beyond weather) ---
+    lang = _detect_lang(transcript)
+    if any(w in low for w in ["grow", "growth", "grow sales", "sales grow", "business grow", "வளர", "बढ़ा", "వృద్ధి", "ಬೆಳೆ"]):
+        answer = _growth_answer(lang)
+        optsG = _choice_options("greeted", lang)
+        send = _copilot_send(phone_digits, answer + _tap_suffix(optsG, channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status": "answered", "question": "growth", "reply": answer, "options": optsG, "send": send, "language": lang, "engine": "growth-forecast+bundle+margin", "phone": phone_digits, "transcript": transcript, "channel": channel}
+
+    qkind = _question_kind(low)
+    if qkind:
+        answer = _qa_answer(qkind, low, lang)
+        if ctx:
+            answer = f"{answer}\n\n(குறிப்பு: {ctx[:200]})" if lang == "ta" \
+                else f"{answer}\n\n(Note from memory: {ctx[:200]})"
+        optsA = _choice_options("answered", lang)
+        send = _copilot_send(phone_digits, answer + _tap_suffix(optsA, channel), force_mock=force_mock,
+                             voice_mode=vmode)
+        return {"status": "answered", "question": qkind, "reply": answer,
+                "options": _choice_options("answered", lang),
+                "send": send, "language": lang, "engine": "live-data",
+                "cognee_context": ctx[:200] if ctx else None,
+                "phone": phone_digits, "transcript": transcript, "channel": channel}
+
+    if _word_hit(low, GREETING_WORDS):
+        reply = _welcome_text(lang)
+        opts = _choice_options("greeted", lang)
+        send = _copilot_send(phone_digits, reply + _tap_suffix(opts, channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status": "greeted", "reply": reply, "options": opts, "send": send,
+                "phone": phone_digits, "transcript": transcript, "channel": channel}
+
+    if _word_hit(low, HELP_WORDS):
+        reply = _help_text(lang)
+        opts = _choice_options("answered", lang)
+        send = _copilot_send(phone_digits, reply + _tap_suffix(opts, channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status": "helped", "reply": reply, "options": opts, "send": send,
+                "phone": phone_digits, "transcript": transcript, "channel": channel}
 
     rules = _rules_intent(transcript)
-    if rules["intent"] != "create_restock_order" or not rules.get("products"):
-        _copilot_send(phone_digits,
-                      "HarvestWise: I did not catch a product. Try: நாளை 20 கிலோ தக்காளி.",
-                      force_mock=force_mock)
-        return {"status": "no_intent", "phone": phone_digits,
+    if rules["intent"] == "decline":
+        pending_orders.pop(phone_digits, None)
+        reply = _cancel_text(lang)
+        _copilot_send(phone_digits, reply, force_mock=force_mock, voice_mode=vmode)
+        return {"status": "declined", "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
+    if rules["intent"] != "create_restock_order" or not rules.get("products"):
+        reply = _fallback_text(lang)
+        opts = _choice_options("greeted", lang)
+        _copilot_send(phone_digits, reply + _tap_suffix(opts, channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status": "no_intent", "reply": reply, "options": opts, "phone": phone_digits,
+                "transcript": transcript, "channel": channel}
+
+    # Optional 'more/less' adjustment to the CURRENT pending basket:
+    # 'இன்னும் 5 கிலோ' / '5 kg less' / 'इसे 5 कम करो' — needs a pending order.
+    adj = _parse_adjustment(low)
+    pend_now = _get_pending(phone_digits)
+    if adj and pend_now:
+        items = pend_now["items"]
+        idx = next((i for i, it in enumerate(items) if it["product"] == adj["product"]), None)
+        if idx is not None:
+            it = items[idx]
+            data = CATALOG[MERCHANT][it["product"]]
+            new_qty = max(1, min(it["recommended_qty"] + adj["delta"], MAX_ORDER_CAP))
+            it["recommended_qty"] = new_qty
+            it["total_inr"] = new_qty * data["price_per_unit"]
+            pend_now["total_inr"] = sum(x["total_inr"] for x in items)
+            ask = _ask_text(items, lang)
+            message = f"{ask}{CONFIRM_SUFFIX[lang]}"
+            _copilot_send(phone_digits, message + _tap_suffix(_choice_options("awaiting_approval", lang), channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status": "awaiting_approval", "adjustment": adj,
+                    "options": _choice_options("awaiting_approval", lang),
+                    "reply": message, "basket_total_inr": pend_now["total_inr"],
+                    "items": [{"product": i["product"], "recommended_qty": i["recommended_qty"],
+                               "unit": i["unit"], "total_inr": i["total_inr"]} for i in items],
+                    "phone": phone_digits, "transcript": transcript,
+                    "engine": "rules", "channel": channel}
 
     items, total = [], 0
     for product, requested in rules["products"].items():
@@ -1100,23 +1909,37 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         items.append(rec)
         total += rec["total_inr"]
     weather = get_weather()
-    # Best response: Sarvam P3 explain with grounding gate, fallback to deterministic template (never hardcoded numbers)
-    ask = llm_mod.template_ask(items, weather["rain_prob"])
+    # Sarvam P3 may REWRITE the ask; the grounding gate in llm.py rejects any
+    # output that drops or alters an engine quantity -> deterministic template.
+    ask = _ask_text(items, lang)
+    # Sarvam upgrade only for Tamil (the P3 prompt + grounding gate are
+    # Tamil-native); every other language gets the deterministic localized ask.
+    if lang == "ta":
+        try:
+            sarvam_ask = llm_mod.explain_ask(items, weather["rain_prob"], language="Tamil")
+            if sarvam_ask:
+                ask = sarvam_ask
+        except Exception:
+            pass  # template ask is always available
+    # Growth bundle nudge: 80% tomato→coriander etc., no extra typing
     try:
-        sarvam_ask = llm_mod.explain_ask(items, weather["rain_prob"], language="Tamil")
-        if sarvam_ask:
-            ask = sarvam_ask
+        bundle = get_bundle_suggestion(list(rules["products"].keys())[0]) if rules["products"] else None
+        if bundle:
+            # pure language, short
+            bl = {"ta": f"💡 {bundle['why']} — {bundle['with']} {bundle['qty']} bunch?", "hi": f"💡 {bundle['why']} — {bundle['with']} {bundle['qty']}?", "en": f"💡 {bundle['why']} — add {bundle['with']} {bundle['qty']}?"}.get(lang, f"💡 {bundle['why']}")
+            message = f"{ask}{CONFIRM_SUFFIX[lang]}\n{bl}"
+        else:
+            message = f"{ask}{CONFIRM_SUFFIX[lang]}"
     except Exception:
-        pass
-    suffix = ("\nசரி என்று பதில் சொல்லுங்கள் (reply சரி to confirm)."
-              if _detect_lang(transcript) == "ta" else
-              "\nReply சரி to confirm.")
-    message = f"{ask}{suffix}"
+        message = f"{ask}{CONFIRM_SUFFIX[lang]}"
     pending_orders[phone_digits] = {"products": rules["products"], "items": items,
-                                    "total_inr": total}
-    _copilot_send(phone_digits, message, force_mock=force_mock)
-    return {"status": "awaiting_approval", "phone": phone_digits,
+                                    "total_inr": total,
+                                    "created": datetime.datetime.now().timestamp()}
+    optsF = _choice_options("awaiting_approval", lang)
+    send = _copilot_send(phone_digits, message + _tap_suffix(optsF, channel), force_mock=force_mock, voice_mode=vmode)
+    return {"status": "awaiting_approval", "options": optsF, "phone": phone_digits,
             "transcript": transcript, "basket_total_inr": total,
+            "reply": message, "send": send,
             "items": [{"product": i["product"], "recommended_qty": i["recommended_qty"],
                        "unit": i["unit"], "total_inr": i["total_inr"]} for i in items],
             "ask": message, "engine": "rules", "channel": channel}
@@ -1124,11 +1947,23 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
 
 @app.post("/wa/inbound")
 def wa_inbound(payload: dict):
-    """WA-AKG webhook: JSON {"event":"message.received","data":{...,"type":
-    "TEXT|AUDIO","content":"...","key":{"remoteJid":"91...@s.whatsapp.net"},
-    "fileUrl":"/media/..."}}."""
+    """WA-AKG webhook: ACK immediately (low-latency), process async.
+    Fixes: 'operation aborted due to timeout' retry storm — the webhook must
+    return 200 in <500ms, not after the WA-AKG send + TTS. Also: groups
+    (@g.us) and unknown callers are ignored, never replied to."""
     data = payload.get("data") or {}
-    phone = (data.get("from") or (data.get("key") or {}).get("remoteJid") or "")
+    raw_phone = (data.get("from") or (data.get("key") or {}).get("remoteJid") or "")
+    # Groups: ignore entirely (no reply, no ledger) — prevents @g.us wrong-number sends
+    if "@g.us" in raw_phone:
+        return {"received": True, "ignored": "group"}
+    phone_digits = _normalize_phone(raw_phone)
+    # Single-merchant lock: only 917010919624 → partner; others ignored silently
+    # (previous code replied "unknown caller" TO the unknown number — that WAS the wrong-number send)
+    if phone_digits and not _allowed_copilot_phone(phone_digits):
+        return {"received": True, "ignored": "unknown_caller", "phone": phone_digits}
+    # Empty phone (e.g. malformed group decrypt) — ack but don't process
+    if not phone_digits:
+        return {"received": True, "ignored": "no_phone"}
     text = data.get("content") or data.get("body") or ""
     media = data.get("fileUrl") or (data.get("quoted") or {}).get("fileUrl") or ""
     if media and not media.startswith("http"):
@@ -1136,11 +1971,18 @@ def wa_inbound(payload: dict):
         if base:
             media = base.rstrip("/") + media
     headers = {"X-API-Key": os.getenv("WA_AKG_API_KEY", "")} if media and os.getenv("WA_AKG_API_KEY") else None
-    result = _handle_merchant_message(
-        phone, text=text, media_url=media, media_headers=headers,
-        content_type=data.get("mimetype") or data.get("contentType") or "",
-        channel="wa-akg")
-    return {"received": True, "result": result}
+    ctype = data.get("mimetype") or data.get("contentType") or ""
+
+    def _process():
+        try:
+            _handle_merchant_message(
+                raw_phone, text=text, media_url=media, media_headers=headers,
+                content_type=ctype, channel="wa-akg")
+        except Exception:
+            pass  # webhook already acked; never raise
+
+    threading.Thread(target=_process, daemon=True, name="wa-inbound").start()
+    return {"received": True, "queued": True, "phone": phone_digits}
 
 
 @app.post("/twilio/inbound")
@@ -1271,9 +2113,18 @@ def dispatch_order(approval: dict):
         return {"status": "failed", "reason": "unknown or already-used approval token"}
 
     # ── Acceptance criterion #5: visible inventory update + auditable memory ──
+    # SECURITY FIX 2026-09-19: the client used to send total_inr and the server
+    # trusted it — a tampered payload could write a fake amount into the ledger,
+    # memory, n8n and the WhatsApp bubble. The price is recomputed from the
+    # CATALOG; a client value is accepted only when it matches (±1 rupee).
+    server_total = order["qty"] * CATALOG[MERCHANT][order["product"]]["price_per_unit"]
+    client_total = approval.get("total_inr")
+    if client_total is not None and abs(int(client_total) - server_total) > 1:
+        return {"status": "failed",
+                "reason": f"total_inr mismatch: engine says {server_total}, payload said {client_total}"}
     delivery = record_delivery(
         MERCHANT, order["product"], order["qty"], order["supplier"],
-        approval.get("total_inr"), token,
+        server_total, token,
     )
     entry = delivery["entry"]
 
@@ -1285,7 +2136,7 @@ def dispatch_order(approval: dict):
         "quantity_kg": order["qty"],
         "unit": entry.get("unit", ""),
         "supplier": order["supplier"],
-        "total_inr": approval.get("total_inr"),
+        "total_inr": server_total,
         "stock_before": entry["stock_before"],
         "stock_after": entry["stock_after"],
         "at": entry["at"],
@@ -1324,9 +2175,10 @@ def dispatch_order(approval: dict):
 def voice_approve(payload: dict):
     """Voice approval gate: {transcript, items: [{product, qty}], or legacy product/qty}."""
     text = (payload.get("transcript") or "").lower()
-    if any(w in text for w in DENY_WORDS):
+    # FIX 2026-09-19: word-safe matching (raw substring matched 'no' inside 'know').
+    if _word_hit(text, DENY_WORDS):
         return {"status": "declined", "heard": text}
-    if not any(w in text for w in APPROVE_WORDS):
+    if not _word_hit(text, APPROVE_WORDS):
         return {"status": "needs_confirmation", "heard": text}
 
     merchant_id = payload.get("merchant_id", MERCHANT)
@@ -1366,7 +2218,8 @@ def tts(payload: dict):
     api_key = os.getenv("SARVAM_API_KEY")
     if not api_key:
         raise HTTPException(503, "SARVAM_API_KEY not configured")
-    try:
+
+    def _do_tts() -> bytes:
         from sarvamai import SarvamAI
         client = SarvamAI(api_subscription_key=api_key)
         resp = client.text_to_speech.convert(text=text, language_code=lang,
@@ -1374,8 +2227,16 @@ def tts(payload: dict):
         aud = resp.audios[0] if hasattr(resp, "audios") else resp
         b64 = aud if isinstance(aud, str) else getattr(aud, "audio", "")
         if not b64:
-            raise HTTPException(502, "no audio in TTS response")
-        return Response(content=base64.b64decode(b64), media_type="audio/wav")
+            raise RuntimeError("no audio in TTS response")
+        return base64.b64decode(b64)
+
+    try:
+        # FIX 2026-09-19: bounded like the other SDK calls — a hung TTS can no
+        # longer park a route worker forever and freeze the API on stage.
+        audio = _SDK_EXECUTOR.submit(_do_tts).result(timeout=40)
+        return Response(content=audio, media_type="audio/wav")
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(504, "TTS timed out — cached audio fallback is the labeled path")
     except HTTPException:
         raise
     except Exception as e:
@@ -1424,12 +2285,18 @@ def get_state(merchant_id: str = MERCHANT):
 
 @app.post("/demo/reset")
 def demo_reset():
-    """Restore seeded inventory + clear the ledger so a rehearsal is repeatable."""
+    """Restore seeded inventory + clear the ledger + copilot state so a
+    rehearsal is repeatable. FIX 2026-09-19: pending copilot orders used to
+    survive a reset — a stale 'சரி' would then dispatch against fresh stock."""
     state = reset_state()
     tokens_cleared = len(dispatched_tokens)
+    pending_cleared = len(pending_orders)
     dispatched_tokens.clear()
+    pending_orders.clear()
+    issued_tokens.clear()
     _save_dispatched()
-    return {"status": "reset", "stock": state["stock"], "tokens_cleared": tokens_cleared}
+    return {"status": "reset", "stock": state["stock"],
+            "tokens_cleared": tokens_cleared, "pending_orders_cleared": pending_cleared}
 
 
 @app.get("/soundbox/briefing")
@@ -1477,3 +2344,19 @@ async def cognee_remember(payload: dict):
     added = await asyncio.to_thread(cognee_client.add_text, texts)
     cognified = await asyncio.to_thread(cognee_client.cognify) if added.get("ok") else {"error": "add_text failed"}
     return {"added": added, "cognify": cognified}
+
+
+@app.get("/cognee/context")
+def cognee_context_view(phone: str = "917010919624"):
+    """Agentic RAG cache view — what the copilot currently 'remembers' per merchant."""
+    phone_digits = _normalize_phone(phone)
+    entry = _COGNEE_CTX_CACHE.get(phone_digits)
+    return {
+        "phone": phone_digits,
+        "cached": bool(entry),
+        "context": entry["context"] if entry else None,
+        "refreshed_at": datetime.datetime.fromtimestamp(entry["at"]).isoformat(timespec="seconds")
+        if entry else None,
+        "preferences": _get_merchant_prefs(phone_digits),
+        "note": "Background Cognee recall warms this cache; replies never block on it.",
+    }

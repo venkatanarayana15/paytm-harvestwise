@@ -1,730 +1,457 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HarvestWise — Voice-first autonomous restocking</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paytm Copilot — AI Business Partner</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{
+  colors:{paytm:{blue:'#00baf2',dark:'#002970'},ink:{900:'#0B1120',800:'#111A2E',700:'#1E293B'}},
+  fontFamily:{sans:['Inter','sans-serif'],mono:['JetBrains Mono','monospace']},
+  animation:{'voice-pulse':'voicePulse 1.2s ease-in-out infinite','slideIn':'slideIn .3s ease-out'}
+},keyframes:{voicePulse:{'0%,100%':{transform:'scale(1)',opacity:1},'50%':{transform:'scale(1.12)',opacity:.85}},slideIn:{from:{opacity:0,transform:'translateY(8px)'},to:{opacity:1,transform:'translateY(0)'}}}}}
+</script>
 <style>
-:root{
-  --navy:#002E6E;--blue:#00BAF2;--blue-d:#0091C2;--green:#10B981;--green-d:#059669;
-  --amber:#F59E0B;--red:#EF4444;--bg:#F1F5F9;--card:#fff;--border:#E2E8F0;
-  --ink:#1E293B;--mut:#64748B;--ink-bg:#0F172A;
-}
 *{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:linear-gradient(90deg,var(--navy),#0A4293);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-header h1{margin:0;font-size:18px;font-weight:700}
-header h1 small{font-weight:400;opacity:.75;font-size:12.5px;margin-left:6px}
-header .who{font-size:12.5px;opacity:.92;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#334155;color:#fff}
-.badge.ok{background:var(--green-d)}
-.badge.err{background:var(--red)}
-.wrap{max-width:1180px;margin:0 auto;padding:18px;display:grid;gap:14px;grid-template-columns:1fr 1fr}
-@media(max-width:860px){.wrap{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
-.card h2{margin:0 0 10px;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:8px}
-.card h2 .h2n{background:var(--navy);color:#fff;border-radius:6px;font-size:11px;padding:1px 7px;letter-spacing:0}
-.kv{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:14px;gap:12px}
-.kv:last-of-type{border:0}
-.kv .lab{color:var(--mut);font-size:13px}
-.btn{display:inline-block;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:#fff;font-weight:600;cursor:pointer;font-size:14px;transition:filter .15s}
-.btn:hover{filter:brightness(.94)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn-green{background:var(--green-d)}
-.btn-rec{background:var(--red)}
-.btn-rec.recording{animation:pulse 1s infinite}
-@keyframes pulse{50%{opacity:.55}}
-.btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--border)}
-.btn-sm{padding:6px 12px;font-size:12px}
-.log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--ink-bg);color:#E2E8F0;padding:10px 12px;border-radius:10px;white-space:pre-wrap;max-height:230px;overflow:auto;line-height:1.45}
-.graph{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.node{padding:6px 11px;border-radius:999px;background:#EFF6FF;border:1px solid #BFDBFE;font-size:12px}
-.node.out{background:var(--green);color:#fff;border-color:var(--green);font-weight:600}
-.edge{color:var(--mut);font-size:12px}
-/* pipeline stepper */
-.flow{display:flex;gap:6px;align-items:stretch;margin:10px 0 2px;flex-wrap:wrap}
-.step{flex:1;min-width:96px;background:#F8FAFC;border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--mut);position:relative;transition:all .25s}
-.step .sn{font-weight:700;font-size:10.5px;color:#94A3B8;display:block}
-.step.run{border-color:var(--amber);background:#FFFBEB;color:#92400E}
-.step.ok{border-color:var(--green);background:#ECFDF5;color:var(--green-d)}
-.step.ok .sn{color:var(--green-d)}
-.full{grid-column:1 / -1}
-small{color:var(--mut)}
-.item{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:14px;background:#FCFDFF}
-.item b{color:var(--navy)}
-.tn{font-size:16px}
-.total-line{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#ECFDF5,#D1FAE5);border:1.5px solid var(--green);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:16px;font-weight:700;color:#065F46}
-input.txt{border:1.5px solid var(--border);border-radius:999px;padding:9px 14px;font-size:14px;width:100%;min-width:180px}
-input.txt:focus{outline:0;border-color:var(--blue)}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.chip{font-size:11.5px;padding:3px 9px;border-radius:6px;background:#F1F5F9;color:#475569;border:1px solid var(--border)}
-.chip.llm{background:#EEF2FF;color:#3730A3;border-color:#C7D2FE}
-.chip.det{background:#ECFDF5;color:#065F46;border-color:#A7F3D0}
-.chip.warn{background:#FFFBEB;color:#92400E;border-color:#FDE68A}
-.stock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-@media(max-width:420px){.stock-grid{grid-template-columns:1fr}}
-.sku{border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#F8FAFC}
-.sku .nm{font-size:15px;font-weight:600}
-.sku .qty{font-size:19px;font-weight:800;color:var(--navy)}
-.sku .qty .up{color:var(--green);font-size:13px;vertical-align:middle}
-.sku .meta{font-size:11px;color:var(--mut);margin-top:2px}
-.wa-dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#94A3B8;margin-right:6px}
-.wa-dot.delivered,.wa-dot.read,.wa-dot.sent{background:var(--green)}
-.wa-dot.queued,.wa-dot.accepted{background:var(--amber)}
-.wa-dot.failed{background:var(--red)}
-.autodemo{background:linear-gradient(90deg,#ECFDF5,#F0FDF4);border:1.5px solid #A7F3D0;border-radius:12px;padding:10px 12px;margin:10px 0}
-.copilot-chat{height:280px;overflow:auto;background:#F8FAFC;border:1.5px solid var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
-.bubble{max-width:78%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
-.bubble.user{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:4px}
-.bubble.bot{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px}
-.bubble.bot.awaiting{border-color:var(--amber);background:#FFFBEB}
-.bubble.bot.dispatched{border-color:var(--green);background:#ECFDF5}
-.bubble .meta{font-size:11px;color:var(--mut);margin-top:4px}
-.bubble.bot .meta{color:#475569}
-footer{max-width:1180px;margin:6px auto 24px;padding:0 18px;font-size:11.5px;color:var(--mut);line-height:1.6}
+body{background:#0B1120;color:#e2e8f0}
+.glass{background:rgba(255,255,255,.06);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);border-radius:18px}
+.card{background:rgba(30,41,59,.55);border:1px solid rgba(255,255,255,.07);border-radius:14px}
+.card:hover{border-color:rgba(0,186,242,.25)}
+.side-active{background:rgba(0,186,242,.14);border-left:3px solid #00baf2;color:#fff!important}
+.voice-btn{background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)}
+.voice-btn.rec{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);animation:voicePulse 1s infinite}
+.bubble-user{background:linear-gradient(135deg,#00baf2 0%,#0284c7 100%);color:#fff}
+.bubble-ai{background:rgba(30,41,59,.9);border:1px solid rgba(255,255,255,.08)}
+.log-line{font-family:'JetBrains Mono',monospace;font-size:11px;padding:7px 10px;border-radius:8px}
+.wave span{display:inline-block;width:3px;height:14px;background:#7c3aed;border-radius:99px;margin:0 1px;animation:wave 1s ease-in-out infinite}
+.wave span:nth-child(2){animation-delay:.1s}.wave span:nth-child(3){animation-delay:.2s}.wave span:nth-child(4){animation-delay:.3s}
+@keyframes wave{0%,100%{height:10px}50%{height:22px}}
+.onboard{backdrop-filter:blur(18px);background:rgba(11,17,32,.92)}
 </style>
 </head>
-<body>
-<header>
-  <h1>🌾 HarvestWise<small>voice-first autonomous restocking for kirana perishables</small></h1>
-  <span class="who">Lakshmi · Kalasipalya · <span id="apiStatus" class="badge">API checking…</span></span>
-</header>
-
-<div class="wrap">
-
-  <!-- 1 · MERCHANT + LIVE STOCK -->
-  <div class="card">
-    <h2><span class="h2n">1</span> Merchant — Lakshmi (representative persona)</h2>
-    <div class="stock-grid" id="stockGrid">
-      <div class="sku" id="skuTomato"><div class="nm tn">தக்காளி <span style="font-size:11px;color:var(--mut)">tomato</span></div>
-        <div class="qty"><span id="stockTomato">—</span> kg <span class="up" id="upTomato"></span></div>
-        <div class="meta">sells 14 kg/day · 2-day shelf life</div></div>
-      <div class="sku" id="skuCoriander"><div class="nm tn">கொத்தமல்லி <span style="font-size:11px;color:var(--mut)">coriander</span></div>
-        <div class="qty"><span id="stockCoriander">—</span> bunches <span class="up" id="upCoriander"></span></div>
-        <div class="meta">sells 8 bunches/day · 1-day shelf life</div></div>
+<body class="h-screen overflow-hidden flex antialiased">
+<!-- ONBOARDING MODAL: voice/text/both at START -->
+<div id="onboard" class="fixed inset-0 z-50 flex items-center justify-center p-6 onboard">
+  <div class="w-full max-w-2xl glass p-8">
+    <div class="flex items-center gap-3 mb-2"><span class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center"><i class="fa-solid fa-handshake"></i></span><h1 class="text-xl font-extrabold">Paytm Copilot — AI Business Partner</h1></div>
+    <p class="text-sm text-white/60 mb-1">Welcome, Lakshmi. Choose how your copilot should talk to you.</p>
+    <p class="text-xs text-amber-300/90 mb-6"><i class="fa-solid fa-circle-info mr-1"></i> Voice messages are for merchants who can't read/write — the copilot also sends voice notes on WhatsApp.</p>
+    <label class="text-xs font600 text-white/70">How should the copilot reply?</label>
+    <div class="grid grid-cols-3 gap-3 mt-2 mb-5">
+      <button onclick="pickMode('voice')" id="m-voice" class="card p-4 text-center border-2"><i class="fa-solid fa-microphone text-xl text-violet-400"></i><div class="font-bold mt-2 text-sm">Voice only</div><div class="text-xs text-white/50">Voice note only<br>for non-readers</div></button>
+      <button onclick="pickMode('text')" id="m-text" class="card p-4 text-center border-2"><i class="fa-solid fa-message text-xl text-cyan-400"></i><div class="font-bold mt-2 text-sm">Text only</div><div class="text-xs text-white/50">Typed chat only</div></button>
+      <button onclick="pickMode('both')" id="m-both" class="card p-4 text-center border-2 ring-2 ring-cyan-400"><i class="fa-solid fa-waveform text-xl text-emerald-400"></i><div class="font-bold mt-2 text-sm">Both</div><div class="text-xs text-white/50">Voice + Text</div></button>
     </div>
-    <div class="kv" style="margin-top:8px"><span class="lab">Weather tomorrow</span><b id="wLine">—</b></div>
-    <div class="kv"><span class="lab">Supplier</span><b>Basavanagudi Mandi</b></div>
-    <div class="row" style="margin-top:10px">
-      <span class="chip" id="weatherChip" title="Seeded = deterministic demo constant (78%) so ₹546 holds on any day; live = real Open-Meteo">weather: …</span>
-      <span class="chip llm" id="engineChip">llm: …</span>
-      <button class="btn btn-ghost btn-sm" onclick="resetDemo()">↺ Reset demo state</button>
-    </div>
-    <small id="stockNote">Paytm-transaction-shaped seeded demo data — never live Paytm access (labeled).</small>
-  </div>
-
-  <!-- 2 · LIVE DEMO -->
-  <div class="card">
-    <h2><span class="h2n">2</span> Live demo — one voice note → executed order</h2>
-    <div class="flow" id="flow">
-      <div class="step" id="s0"><span class="sn">1 · HEAR</span>Tamil voice note</div>
-      <div class="step" id="s1b"><span class="sn">2 · DECIDE</span>Engine quantities</div>
-      <div class="step" id="s2"><span class="sn">3 · APPROVE</span>She says “சரி”</div>
-      <div class="step" id="s3"><span class="sn">4 · DISPATCH</span>n8n → WhatsApp</div>
-      <div class="step" id="s4"><span class="sn">5 · REMEMBER</span>Stock + memory</div>
-    </div>
-    <div class="autodemo">
-      <div class="row">
-        <button class="btn btn-green" onclick="runFullAuto()" style="font-size:15px;padding:12px 20px">⚡ Full Auto Demo</button>
-        <span style="font-size:12.5px;color:#065F46">One click: Tamil command → engine 20+6 = ₹546 → “சரி” → dispatch → WhatsApp → ledger.</span>
+    <div class="mb-3"><label class="text-xs text-white/60">Your name *</label><input id="ob-name" placeholder="e.g. Lakshmi" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm"></div>
+    <div class="mb-3"><label class="text-xs text-white/60">Shop / Business *</label>
+      <div class="mt-1.5 flex flex-wrap gap-2" id="ob-biz-opts">
+        <button onclick="pickBiz('Kirana Store')" data-biz="Kirana Store" class="biz-opt px-3 py-1.5 rounded-full text-xs border border-white/15 bg-white/5">Kirana Store</button>
+        <button onclick="pickBiz('Vegetable Stall')" data-biz="Vegetable Stall" class="biz-opt px-3 py-1.5 rounded-full text-xs border border-white/15 bg-white/5">Vegetable Stall</button>
+        <button onclick="pickBiz('Tea & Snacks')" data-biz="Tea & Snacks" class="biz-opt px-3 py-1.5 rounded-full text-xs border border-white/15 bg-white/5">Tea & Snacks</button>
+        <button onclick="pickBiz('General Store')" data-biz="General Store" class="biz-opt px-3 py-1.5 rounded-full text-xs border border-white/15 bg-white/5">General Store</button>
+        <button onclick="pickBiz('Others')" data-biz="Others" class="biz-opt px-3 py-1.5 rounded-full text-xs border border-white/15 bg-white/5">Others ✏️</button>
       </div>
+      <input id="ob-business" placeholder="Select above or type if Others" class="w-full mt-2 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm">
     </div>
-    <div class="row">
-      <button class="btn btn-rec" id="btnMic" onclick="toggleMic()">🎙 Record command</button>
-      <button class="btn btn-ghost" onclick="playCached()" title="plays ui/assets/command_ta.wav (labeled synthetic backup)">▶ Cached audio</button>
-      <select id="langSel" title="Speech-recognition language (Sarvam saaras:v3)" style="border:1.5px solid var(--border);border-radius:999px;padding:9px 12px;font-size:13px;background:#fff">
-        <option value="ta-IN">தமிழ் Tamil</option>
-        <option value="kn-IN">ಕನ್ನಡ Kannada</option>
-        <option value="hi-IN">हिंदी Hindi</option>
-        <option value="te-IN">తెలుగు Telugu</option>
-        <option value="en-IN">English</option>
-      </select>
+    <div class="mb-3"><label class="text-xs text-white/60">What do you sell? * <span class="text-white/40">(check all that apply)</span></label>
+      <div class="mt-1.5 grid grid-cols-2 gap-2" id="ob-prod-checks">
+        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer"><input type="checkbox" value="tomato, onion, potato, coriander" class="prod-check accent-cyan-500"> 🥬 Vegetables</label>
+        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer"><input type="checkbox" value="rice, dal, oil, sugar" class="prod-check accent-cyan-500"> 🛒 Kirana</label>
+        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer"><input type="checkbox" value="banana, mango, apple" class="prod-check accent-cyan-500"> 🍎 Fruits</label>
+        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer"><input type="checkbox" value="Others" class="prod-check accent-cyan-500" id="prod-others-chk"> Others ✏️</label>
+      </div>
+      <input id="ob-products" placeholder="Selected items appear here — add if Others" class="w-full mt-2 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm">
+      <input id="ob-products-other" placeholder="Type other products if selected" class="hidden w-full mt-2 bg-slate-800 border border-amber-500/30 rounded-lg px-3 py-2.5 text-sm">
     </div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn btn-ghost btn-sm" onclick="quickDemo('ta')">TA: 20 கிலோ</button>
-      <button class="btn btn-ghost btn-sm" onclick="quickDemo('kn')">KN: 20 ಕಿಲೋ</button>
-      <button class="btn btn-ghost btn-sm" onclick="quickDemo('hi')">HI: 20 किलो</button>
-      <button class="btn btn-ghost btn-sm" onclick="quickDemo('te')">TE: 20 కిలో</button>
-      <button class="btn btn-ghost btn-sm" onclick="quickDemo('en')">EN: 20 kg</button>
+    <div class="grid grid-cols-2 gap-3 mb-5">
+      <div><label class="text-xs text-white/60">Language</label><select id="ob-lang" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm"><option value="ta-IN">தமிழ் Tamil (default)</option><option value="hi-IN">हिन्दी Hindi</option><option value="te-IN">తెలుగు Telugu</option><option value="kn-IN">ಕನ್ನಡ Kannada</option><option value="en-US">English</option></select></div>
+      <div><label class="text-xs text-white/60">Merchant phone</label><input id="ob-phone" value="917010919624" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono"></div>
     </div>
-    <div class="row" style="margin-top:8px">
-      <input class="txt" id="typedCmd" placeholder='typed fallback: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி"'>
-      <button class="btn btn-ghost" onclick="runPipeline(document.getElementById('typedCmd').value)">Run</button>
+    <div class="flex gap-3">
+      <button onclick="saveOnboard()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 font-bold text-white">Start copilot →</button>
+      <button onclick="saveOnboard(true)" class="px-4 py-3 rounded-xl bg-white/10 text-sm">Skip, use Both + Tamil</button>
     </div>
-    <div id="transcriptLine" style="margin-top:8px;font-size:13.5px;color:#334155;min-height:18px"></div>
-    <div id="itemsBox"></div>
-    <div class="row" style="margin-top:10px">
-      <button class="btn btn-rec" id="btnMicApprove" onclick="toggleMic('approve')" disabled>🎙 Approve — say “சரி”</button>
-      <button class="btn btn-ghost" id="btnApproveTyped" onclick="approveVoice('சரி')" disabled>✅ சரி (typed fallback)</button>
-      <button class="btn" id="btnDispatch" onclick="dispatchAll()" disabled>4. Dispatch via n8n</button>
-    </div>
-    <audio id="player" controls style="width:100%;display:none;margin-top:8px"></audio>
-    <audio id="cmdPlayer" style="display:none"></audio>
-  </div>
-
-  <!-- 2b · COPILOT CHAT (mirrors WhatsApp, same /copilot/simulate brain) -->
-  <div class="card">
-    <h2><span class="h2n">2b</span> Copilot — WhatsApp + Web <span class="chip det" style="margin-left:auto">same brain as WhatsApp</span></h2>
-    <div class="copilot-chat" id="copilotChatBox"></div>
-    <div class="row" style="margin-top:10px">
-      <input class="txt" id="copilotInput" placeholder='நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி — or "20kg tomato"' onkeydown="if(event.key==='Enter')copilotSend()">
-      <button class="btn" onclick="copilotSend()">Send</button>
-      <button class="btn btn-ghost" id="copilotMic" onclick="copilotMic()" title="Voice → Sarvam STT → copilot">🎙</button>
-    </div>
-    <div class="row" style="margin-top:6px">
-      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('ta')">TA: 20 கிலோ</button>
-      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('kn')">KN: 20 ಕಿಲೋ</button>
-      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('hi')">HI: 20 किलो</button>
-      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('en')">EN: 20 kg</button>
-      <button class="btn btn-ghost btn-sm" onclick="copilotApprove()">சரி approve</button>
-      <button class="btn btn-ghost btn-sm" onclick="copilotReset()">Clear</button>
-    </div>
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <span class="chip">merchant:</span><input class="txt" id="copilotPhoneInput" value="917010919624" style="width:150px;font-size:12px;padding:6px 10px" title="Allowlisted merchant phone (comma-separated in COPILOT_ALLOWED_PHONES)">
-      <span class="chip llm" id="copilotEngine">engine: deterministic</span>
-      <span class="chip" id="copilotTransport">WA-AKG → Twilio → mock</span>
-    </div>
-    <small>Same <code>/copilot/simulate</code> + <code>/wa/inbound</code> brain as WhatsApp. Voice uses Sarvam saaras:v3 (OGG native). Quantities always from engine.</small>
-  </div>
-
-  <!-- 3 · WHY THIS ORDER -->
-  <div class="card">
-    <h2><span class="h2n">3</span> Why this order? — grounded reasoning</h2>
-    <div class="graph" id="graph">
-      <span class="node">Lakshmi → sells → தக்காளி · கொத்தமல்லி</span><span class="edge">→</span>
-      <span class="node" id="gStock">stock —</span><span class="edge">→</span>
-      <span class="node" id="gRain">rain —</span><span class="edge">→</span>
-      <span class="node out" id="graphOut">awaiting order</span>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button class="btn btn-ghost" onclick="doReason()">Reason (Sarvam-105B)</button>
-      <button class="btn btn-ghost" onclick="doRecall()">Recall from Cognee</button>
-    </div>
-    <div id="recallBox" class="log" style="margin-top:10px;display:none"></div>
-    <small>LLM explains; the deterministic engine decides — every number traces to an observation, never to the model.</small>
-  </div>
-
-  <!-- 4 · N8N EXECUTION -->
-  <div class="card">
-    <h2><span class="h2n">4</span> n8n — execution (re-validates, then sends)</h2>
-    <div id="n8nBox" class="log">Waiting for dispatch… (N8N_WEBHOOK_URL + Twilio configured in .env)</div>
-    <small>Human-approval gate → wholesaler WhatsApp → inventory update → status. n8n independently re-validates every field before sending.</small>
-  </div>
-
-  <!-- 5 · WHATSAPP DELIVERY -->
-  <div class="card">
-    <h2><span class="h2n">5</span> WhatsApp delivery — Twilio <span class="chip" id="waMode" style="margin-left:auto">checking…</span></h2>
-    <div id="waBox" class="log">Loading WhatsApp status…</div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn btn-ghost btn-sm" onclick="refreshWhatsapp()">↻ Refresh delivery status</button>
-      <small id="waHint">Delivery state comes live from Twilio’s API — accepted → sent → delivered.</small>
-    </div>
-  </div>
-
-  <!-- 6 · SOUNDBOX -->
-  <div class="card">
-    <h2><span class="h2n">6</span> Paytm Soundbox — morning briefing (simulated)</h2>
-    <div id="soundboxBox" class="log">Loading briefing…</div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn btn-ghost" onclick="playSoundbox()">▶ Play on Soundbox</button>
-      <small>Plays on the device she already owns — upgrade, not a new device.</small>
-    </div>
-    <audio id="soundboxPlayer" controls style="width:100%;display:none;margin-top:8px"></audio>
-  </div>
-
-  <!-- 7 · LEDGER -->
-  <div class="card">
-    <h2><span class="h2n">7</span> Inventory &amp; memory — post-dispatch ledger</h2>
-    <div id="ledgerBox" class="log">No orders yet. Run the demo to see stock move and memory update.</div>
-    <small>Acceptance criterion: a visible memory/inventory update after execution — server-written, cannot disagree with the screen.</small>
-  </div>
-
-  <!-- 8 · TELEMETRY -->
-  <div class="card full">
-    <h2><span class="h2n">8</span> Pilot telemetry — what Paytm lending sees</h2>
-    <div class="log" id="telemetryBox">{
-  "procurement_telemetry": {
-    "merchant": "lakshmi (representative persona)",
-    "orders_90d": 78, "on_time_dispatch_rate": "96%",
-    "spoilage_preserved_model": "₹7,200/mo (illustrative)",
-    "input_cost_volatility": "low (decay-aware ordering)"
-  },
-  "signal_for_underwriting": "causal, auditable restocking behavior — not just GMV"
-}</div>
-    <small>Lending today = GMV. Missing = procurement rhythm. HarvestWise produces it — simulated in this prototype.</small>
-  </div>
-
-  <!-- 9 · SYSLOG -->
-  <div class="card full">
-    <h2><span class="h2n">9</span> System log</h2>
-    <div id="syslog" class="log" style="max-height:200px">Booting…</div>
+    <p class="text-[11px] text-white/40 mt-3">Stored locally for low latency + mirrored to Cognee knowledge graph. Change anytime: say “voice mode” / “text mode” / “both” or use Preferences.</p>
   </div>
 </div>
 
-<footer>
-  HarvestWise · Team Sairam · Paytm Build for India AI Hackathon — Voice: Sarvam (STT saaras:v3 · LLM sarvam-105b · TTS bulbul:v3) ·
-  Memory: Cognee causal graph · Execution: n8n · WhatsApp: Twilio. Data on screen is labeled seeded demo data;
-  quantities come only from the deterministic engine; every dispatch requires explicit merchant approval.
-</footer>
+<!-- SIDEBAR -->
+<aside class="w-[280px] shrink-0 bg-[#0f172a] border-r border-white/5 flex flex-col">
+  <div class="p-6 flex items-center gap-3 border-b border-white/5">
+    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center"><i class="fa-solid fa-bolt"></i></div>
+    <div><div class="font-extrabold leading-none">Paytm Copilot</div><div class="text-[11px] text-white/50">AI Business Partner • HarvestWise</div></div>
+  </div>
+  <nav class="flex-1 p-3 space-y-1 text-sm">
+    <button onclick="nav('copilot')" data-nav="copilot" class="side-active w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/70"><i class="fa-solid fa-comments w-5"></i> Copilot Chat <span id="nav-voice-badge" class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">both • ta-IN</span></button>
+    <button onclick="nav('whatsapp')" data-nav="whatsapp" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/60 hover:text-white"><i class="fa-brands fa-whatsapp w-5 text-emerald-400"></i> WhatsApp Live <span class="ml-auto w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span></button>
+    <button onclick="nav('growth')" data-nav="growth" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/60 hover:text-white"><i class="fa-solid fa-chart-line w-5"></i> Growth Partner (BMC)</button>
+    <button onclick="nav('inventory')" data-nav="inventory" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/60 hover:text-white"><i class="fa-solid fa-boxes-stacked w-5"></i> Inventory & Weather</button>
+    <button onclick="nav('memory')" data-nav="memory" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/60 hover:text-white"><i class="fa-solid fa-brain w-5"></i> Memory Graph</button>
+    <button onclick="nav('prefs')" data-nav="prefs" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-white/60 hover:text-white"><i class="fa-solid fa-sliders w-5"></i> Preferences</button>
+  </nav>
+  <div class="p-3 border-t border-white/5 space-y-2">
+    <div class="flex gap-2 text-[10px]"><span class="px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">Sarvam</span><span class="px-2 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25">Cognee</span><span class="px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">n8n</span></div>
+    <div class="text-[11px] text-white/40">Low-latency • deterministic engine • Sarvam grounding gate</div>
+    <div class="text-[11px] text-white/50">Phone: <span id="side-phone" class="font-mono">917010919624</span> • <a href="#" onclick="document.getElementById('onboard').classList.remove('hidden');return false" class="underline">change</a></div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="flex-1 flex flex-col min-w-0">
+  <header class="h-[64px] shrink-0 border-b border-white/5 flex items-center justify-between px-6">
+    <div class="flex items-center gap-3">
+      <h2 id="page-title" class="font-bold">Copilot Chat</h2>
+      <span id="latency-badge" class="hidden text-[11px] px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">— ms</span>
+      <span id="wa-badge" class="text-[11px] px-2 py-1 rounded-full bg-white/5 border border-white/10">WA-AKG …</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="quick-voice" onchange="quickVoice(this.value)" class="bg-slate-800 border border-white/10 rounded-lg px-2 py-1.5 text-xs"><option value="both">Both</option><option value="voice">Voice</option><option value="text">Text</option></select>
+      <select id="quick-lang" onchange="quickLang(this.value)" class="bg-slate-800 border border-white/10 rounded-lg px-2 py-1.5 text-xs"><option value="ta-IN">TA</option><option value="hi-IN">HI</option><option value="te-IN">TE</option><option value="kn-IN">KN</option><option value="en-US">EN</option></select>
+      <button onclick="refreshAll()" class="px-3 py-1.5 rounded-lg bg-white/10 text-xs"><i class="fa-solid fa-rotate mr-1"></i> Refresh</button>
+    </div>
+  </header>
+
+  <div class="flex-1 overflow-auto p-6 space-y-6" id="views">
+    <!-- COPILOT -->
+    <section id="view-copilot" class="space-y-6">
+      <div class="glass p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div><h3 class="font-bold">Talk to your AI Business Partner</h3><p class="text-xs text-white/50 mt-1">Type, or hold <span class="text-violet-300">mic</span> for voice. Choose how you want replies:</p>
+            <div class="mt-2 flex items-center gap-2">
+              <div class="flex rounded-full p-1 bg-slate-800 border border-white/10">
+                <button onclick="setVoice('voice')" id="sel-voice" class="px-3 py-1 rounded-full text-xs flex items-center gap-1"><i class="fa-solid fa-microphone"></i> Voice</button>
+                <button onclick="setVoice('text')" id="sel-text" class="px-3 py-1 rounded-full text-xs flex items-center gap-1"><i class="fa-solid fa-message"></i> Text</button>
+                <button onclick="setVoice('both')" id="sel-both" class="px-3 py-1 rounded-full text-xs flex items-center gap-1 bg-cyan-500 text-white"><i class="fa-solid fa-waveform"></i> Both</button>
+              </div>
+              <span id="pref-hint" class="text-xs text-cyan-300">Both • Tamil</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">Mixed Tamil+English → pure reply (no mix)</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1.5 text-xs"><input id="auto-voice" type="checkbox" checked class="accent-cyan-500"> Auto-play</label>
+            <button onclick="playLast()" class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><i class="fa-solid fa-volume-high text-xs"></i></button>
+          </div>
+        </div>
+        <div id="chat" class="mt-4 h-[360px] overflow-auto space-y-3 pr-1">
+          <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-sparkles text-xs"></i></div><div class="bubble-ai px-4 py-3 rounded-2xl rounded-tl-none text-sm max-w-[78%]">Vanakkam Lakshmi! I am your Paytm business partner. Try: <span class="text-cyan-300">“Check stock”</span> • <span class="text-cyan-300">“tomato 20kg”</span> • <span class="text-cyan-300">“How to grow sales?”</span> — or hold mic and speak. Voice notes go to WhatsApp for non-readers.</div></div>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="mic" class="voice-btn w-12 h-12 rounded-full flex items-center justify-center shrink-0"><i class="fa-solid fa-microphone"></i></button>
+          <div id="wave" class="hidden wave"><span></span><span></span><span></span><span></span></div>
+          <input id="input" placeholder="Type or use mic… (Enter to send)" class="flex-1 bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-white/30 outline-none focus:border-cyan-400/40">
+          <button onclick="send()" class="w-12 h-12 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-center"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+        <div class="mt-2 text-[11px] text-white/40">STT: Sarvam saaras:v3 • TTS: bulbul:v3 (kavitha) • Fallback: browser speechSynthesis (<1s)</div>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="card p-4"><div class="text-xs text-white/50">Suggested asks</div><div class="mt-2 flex flex-wrap gap-2 text-xs"><button onclick="fill('Check stock')" class="px-2 py-1 rounded-full bg-white/10">Check stock</button><button onclick="fill('tomato 20kg')" class="px-2 py-1 rounded-full bg-white/10">tomato 20kg</button><button onclick="fill('Why 20kg?')" class="px-2 py-1 rounded-full bg-white/10">Why 20kg?</button><button onclick="fill('How to grow sales?')" class="px-2 py-1 rounded-full bg-white/10">How to grow sales?</button><button onclick="fill('voice mode')" class="px-2 py-1 rounded-full bg-violet-500/20 border border-violet-500/30">voice mode</button></div></div>
+        <div class="card p-4"><div class="text-xs text-white/50">Agentic RAG (low-latency)</div><div class="text-xs mt-2 leading-relaxed text-white/70">Deterministic engine owns quantities • Sarvam fast-model for intent (P1) + grounded Tamil ask (P3) • Cognee recall runs <span class="text-emerald-300">off the hot path</span> (background thread → cache) • LLM commits, Python decides.</div></div>
+        <div class="card p-4"><div class="text-xs text-white/50">Activity log (live)</div><div id="log" class="mt-2 space-y-1 max-h-[110px] overflow-auto"><div class="log-line bg-white/5 text-white/40">Ready — Sarvam • Cognee • n8n</div></div></div>
+      </div>
+    </section>
+
+    <!-- WHATSAPP LIVE -->
+    <section id="view-whatsapp" class="hidden space-y-6">
+      <div class="glass p-5">
+        <h3 class="font-bold"><i class="fa-brands fa-whatsapp text-emerald-400 mr-2"></i> WhatsApp Copilot — Live</h3>
+        <p class="text-xs text-white/50 mt-1">Same brain as the UI copilot. Voice notes are transcribed via Sarvam STT; replies are sent as text and, when preferred, as voice notes via WA-AKG <code class="text-cyan-300">/api/messages/{session}/{jid}/media</code>.</p>
+        <div class="mt-4 grid grid-cols-2 gap-4">
+          <div class="card p-3"><div class="text-xs font-bold mb-2">Send test to WhatsApp (real delivery)</div><input id="wa-text" placeholder="Message for 917010919624" class="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm"><div class="flex gap-2 mt-2"><button onclick="waSend()" class="flex-1 py-2 rounded-lg bg-emerald-600 font-bold text-sm">Send via WA-AKG</button><button onclick="waVoice()" class="px-3 py-2 rounded-lg bg-violet-600 text-sm"><i class="fa-solid fa-microphone"></i> Voice</button></div><div id="wa-result" class="text-xs mt-2 text-white/60"></div></div>
+          <div class="card p-3"><div class="text-xs font-bold">Webhook health</div><div id="wa-health" class="text-xs mt-2 font-mono text-white/60">checking…</div><div class="text-[11px] text-white/40 mt-2">If WA-AKG shows 500, check API <code>/wa/inbound</code> — fixed: <code>_message_cooldown</code> NameError. Group decrypt errors are WA session — ignore, webhook still 200.</div></div>
+        </div>
+        <div class="mt-4 card p-3"><div class="text-xs font-bold">Simulated WhatsApp thread (mirrors /copilot/simulate)</div><div id="wa-chat" class="mt-2 space-y-2 max-h-[260px] overflow-auto text-sm"></div><div class="flex gap-2 mt-2"><input id="wa-sim-input" placeholder="Simulate merchant message…" class="flex-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm"><button onclick="waSim()" class="px-4 py-2 rounded-lg bg-cyan-600 text-sm">Simulate</button></div></div>
+      </div>
+    </section>
+
+    <!-- GROWTH / BMC -->
+    <section id="view-growth" class="hidden space-y-6">
+      <div class="glass p-5">
+        <h3 class="font-bold">AI Business Partner — Business Model Canvas</h3>
+        <p class="text-xs text-white/50">Every reply is grounded in the BMC: the copilot IS the business partner, not a payment widget.</p>
+        <div class="grid grid-cols-3 gap-3 mt-4 text-xs">
+          <div class="card p-3"><div class="font-bold text-cyan-300">Key Partners</div><div class="text-white/70 mt-1">Paytm (Soundbox, payments), Sarvam (voice), Cognee (memory), n8n (automation), mandi suppliers</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Key Activities</div><div class="text-white/70 mt-1">Observe→Ask→Approve→Act→Learn loop; voice transcription; grounded restocking; growth nudges</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Value Prop</div><div class="text-white/70 mt-1">For non-literate merchants: <b>voice-first</b> business partner. Prevents stock-out, grows sales, remembers preferences. Low-latency, local-first.</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Customer Relationship</div><div class="text-white/70 mt-1">WhatsApp copilot (primary) + dashboard copilot. Preference: voice/text/both. Language-aware (Tamil default).</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Customer Segments</div><div class="text-white/70 mt-1">Kirana / vegetable vendors (Lakshmi persona). Sub-segment: cannot read/write → voice-only.</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Channels</div><div class="text-white/70 mt-1">WhatsApp (WA-AKG), Paytm Soundbox briefing, dashboard</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Key Resources</div><div class="text-white/70 mt-1">Deterministic restock engine, memory.json + Cognee graph, Sarvam models (saaras:v3, bulbul:v3)</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Cost Structure</div><div class="text-white/70 mt-1">Sarvam API, WA-AKG host, Cognee cloud. Mitigated: bounded executors, health cache, no LLM in hot loop.</div></div>
+          <div class="card p-3"><div class="font-bold text-cyan-300">Revenue Streams</div><div class="text-white/70 mt-1">Paytm merchant retention + Soundbox attach; supplier lead fees; <span class="text-emerald-300">growth = more GMV</span></div></div>
+        </div>
+        <div class="mt-4 card p-3 text-xs"><span class="font-bold">Flow per turn:</span> Sarvam understands (STT/intent) → Engine decides quantity (deterministic) → Cognee remembers (graph) → n8n automates (WhatsApp/UI) → Sarvam voices (TTS). <span class="text-cyan-300">Agentic RAG: Cognee context is cached off hot path; replies never block on 12s recall.</span></div>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section id="view-inventory" class="hidden"><div class="glass p-5"><h3 class="font-bold">Inventory & Weather</h3><div id="inv" class="mt-3 text-sm text-white/70">Loading…</div></div></section>
+
+    <!-- MEMORY -->
+    <section id="view-memory" class="hidden space-y-4">
+      <div class="glass p-5"><h3 class="font-bold">Cognee Knowledge Graph — Memory</h3><p class="text-xs text-white/50">Sarvam creates facts (transcripts, intents) → <code class="text-cyan-300">add_text</code> → <code class="text-cyan-300">cognify</code> builds graph → <code class="text-cyan-300">recall</code> retrieves. Every turn is learned; recall warms a 5-min cache.</p><div class="grid grid-cols-2 gap-3 mt-3"><div class="card p-3"><div class="text-xs font-bold">Cached context (agentic RAG)</div><pre id="ctx" class="text-[11px] font-mono text-white/70 whitespace-pre-wrap mt-2">—</pre></div><div class="card p-3"><div class="text-xs font-bold">Local memory.json</div><pre id="mem" class="text-[11px] font-mono text-white/70 whitespace-pre-wrap mt-2 max-h-[220px] overflow-auto">—</pre></div></div><div class="card p-3 mt-3"><div class="text-xs font-bold">n8n workflows (fired on dispatch)</div><ul class="text-xs text-white/70 list-disc ml-4 mt-2"><li><b>Wholesale order → supplier webhook</b> (<code>_fire_n8n</code>) — record → N8N_WEBHOOK_URL</li><li><b>WhatsApp confirm</b> — WA-AKG text + optional voice note (bulbul:v3 → /media type=audio)</li><li><b>Soundbox briefing</b> — daily <code>/soundbox/briefing</code> payload</li><li><b>Memory write</b> — <code>remember_async(add_text→cognify)</code> on every turn</li></ul></div></div>
+    </section>
+
+    <!-- PREFS -->
+    <section id="view-prefs" class="hidden"><div class="glass p-5 max-w-xl"><h3 class="font-bold">Preferences</h3><p class="text-xs text-white/50">Voice/text/both + language. Persisted locally + Cognee. Say “voice mode” in chat to switch.</p><div class="grid grid-cols-2 gap-3 mt-4"><div><label class="text-xs text-white/60">Voice mode</label><select id="pref-voice" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm"><option value="both">Both (voice + text)</option><option value="voice">Voice only</option><option value="text">Text only</option></select></div><div><label class="text-xs text-white/60">Language</label><select id="pref-lang" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm"><option value="ta-IN">Tamil</option><option value="hi-IN">Hindi</option><option value="te-IN">Telugu</option><option value="kn-IN">Kannada</option><option value="en-US">English</option></select></div></div><div class="mt-3"><label class="text-xs text-white/60">Phone</label><input id="pref-phone" class="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono"></div><button onclick="savePrefs()" class="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 font-bold">Save</button><div id="pref-status" class="text-xs mt-2 text-white/60"></div></div></section>
+  </div>
+</main>
 
 <script>
-// Use the IPv4 literal, NOT 'localhost'. Measured on this machine: 'localhost'
-// costs ~2s per request (IPv6 ::1 attempted first, then falls back), which made
-// every dashboard click feel broken. 127.0.0.1 responds in 3-35ms.
-const API = 'http://127.0.0.1:8000';
-let lastBasket = null, tokens = {}, mediaRecorder = null, chunks = [], micMode = 'command', lastOrders = [];
+// API base: ?api=https://your-api.onrender.com overrides, else localStorage, else localhost (dev)
+const API = new URLSearchParams(location.search).get('api') || localStorage.getItem('api_base') || "http://localhost:8000";
+if(new URLSearchParams(location.search).get('api')) localStorage.setItem('api_base', API);
+let PHONE = localStorage.getItem("phone") || "917010919624";
+let VOICE_MODE = localStorage.getItem("voice_mode") || "both";
+let LANG = localStorage.getItem("lang") || "ta-IN";
+let LAST_REPLY = "";
+let LAST_AUDIO = null;
 
-function log(m){ const el = document.getElementById('syslog'); el.textContent += '\n' + m; el.scrollTop = el.scrollHeight; }
-function step(id, cls){ const el = document.getElementById(id); if (el) el.className = 'step' + (cls ? ' ' + cls : ''); }
-function stepsReset(){ ['s0','s1b','s2','s3','s4'].forEach(s => step(s)); }
-function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function sttLang(){ return document.getElementById('langSel').value || 'ta-IN'; }
+function log(kind, msg){
+  const c={sarvam:'bg-amber-500/15 text-amber-200 border-amber-500/20',cognee:'bg-blue-500/15 text-blue-200 border-blue-500/20',n8n:'bg-emerald-500/15 text-emerald-200 border-emerald-500/20',api:'bg-white/5 text-white/60 border-white/10',voice:'bg-violet-500/15 text-violet-200 border-violet-500/25'}[kind]||'bg-white/5 text-white/60';
+  const el=document.getElementById('log');
+  const d=document.createElement('div'); d.className='log-line border '+c; d.textContent='['+kind+'] '+msg;
+  el.prepend(d); while(el.children.length>12) el.removeChild(el.lastChild);
+}
 
-async function check(){
-  try{
-    const r = await fetch(API + '/health'); const j = await r.json();
-    const b = document.getElementById('apiStatus');
-    b.textContent = 'API ok'; b.className = 'badge ok';
-    document.getElementById('weatherChip').textContent = 'weather: ' + j.weather_mode;
-    document.getElementById('engineChip').textContent = 'llm: ' + j.llm_mode;
-    log('API health ok · weather_mode=' + j.weather_mode + ' · llm_mode=' + j.llm_mode + ' · cognee=' + j.cognee);
-    if (j.twilio_recipient === 'NOT_SET') log('⚠ TWILIO_WHATSAPP_TO not set — WhatsApp dispatch will be skipped (labeled), not faked');
-    if (j.n8n !== 'configured') log('⚠ N8N_WEBHOOK_URL not set — dispatch will be recorded but not forwarded to n8n');
-  }catch(e){
-    const b = document.getElementById('apiStatus');
-    b.textContent = 'API offline — run uvicorn'; b.className = 'badge err';
-    log('API offline: ' + e);
+function pickMode(m){ VOICE_MODE=m; document.querySelectorAll('[id^=\"m-\"]').forEach(b=>b.classList.remove('ring-2','ring-cyan-400')); document.getElementById('m-'+m).classList.add('ring-2','ring-cyan-400'); }
+function pickBiz(v){
+  document.getElementById('ob-business').value = v==='Others' ? '' : v;
+  document.querySelectorAll('.biz-opt').forEach(b=> b.classList.remove('bg-cyan-500','text-white','border-cyan-400'));
+  const el=document.querySelector(`[data-biz="${v}"]`);
+  if(el) el.classList.add('bg-cyan-500','text-white','border-cyan-400');
+  if(v==='Others') document.getElementById('ob-business').focus();
+}
+function syncProducts(){
+  const checks=[...document.querySelectorAll('.prod-check:checked')].map(c=>c.value).filter(v=>v!=='Others');
+  const other=document.getElementById('prod-others-chk').checked;
+  const otherTxt=document.getElementById('ob-products-other').value.trim();
+  let combined=[...checks];
+  if(other && otherTxt) combined.push(otherTxt);
+  else if(other && !otherTxt) combined.push(''); // need typing
+  document.getElementById('ob-products').value = combined.filter(Boolean).join(', ');
+  document.getElementById('ob-products-other').classList.toggle('hidden', !other);
+}
+document.addEventListener('change', e=>{
+  if(e.target.classList.contains('prod-check')) syncProducts();
+});
+document.addEventListener('input', e=>{
+  if(e.target.id==='ob-products-other') syncProducts();
+});
+async function saveOnboard(skip){
+  if(skip){ VOICE_MODE='both'; LANG='ta-IN'; }
+  else {
+    LANG=document.getElementById('ob-lang').value; PHONE=document.getElementById('ob-phone').value.trim()||PHONE;
+    const name=document.getElementById('ob-name').value.trim();
+    const business=document.getElementById('ob-business').value.trim();
+    const products=document.getElementById('ob-products').value.trim();
+    if(!skip && (!name || !business || !products)){ alert('Please fill name, business and what you sell — the Business Partner learns your business.'); return; }
+    // persist business profile first so next message is NOT onboarding again
+    if(name && business && products){
+      try{ await fetch(API+'/merchant/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,name,business,products,language:LANG,onboarding_complete:true,step:3})}); log('cognee','Business profile saved → Cognee'); }catch(e){ log('api','Profile save failed: '+e.message)}
+    }
   }
+  localStorage.setItem('phone',PHONE); localStorage.setItem('voice_mode',VOICE_MODE); localStorage.setItem('lang',LANG);
+  // also persist name/business for header
+  try{ localStorage.setItem('merchant_name', document.getElementById('ob-name').value.trim()); localStorage.setItem('merchant_business', document.getElementById('ob-business').value.trim()); }catch{}
+  await persistPrefs(); document.getElementById('onboard').classList.add('hidden'); syncPrefUI(); log('api','Preference: '+VOICE_MODE+' • '+LANG+' | Business Partner ready');
+  // show welcome in chat if was onboarding
+  setTimeout(()=>{ bubbleAI('Vanakkam '+(localStorage.getItem('merchant_name')||'')+'! 🙏 Your Business Partner is ready for '+ (localStorage.getItem('merchant_business')||'your business')+'. Try “Check stock” or “How to grow sales?”', false); }, 400);
+}
+function setVoice(m){ VOICE_MODE=m; localStorage.setItem('voice_mode',m); persistPrefs(); syncPrefUI(); log('api','Mode → '+m); }
+function syncPrefUI(){
+  document.getElementById('side-phone').textContent=PHONE;
+  document.getElementById('nav-voice-badge').textContent=VOICE_MODE+' • '+LANG;
+  document.getElementById('pref-hint').textContent=(VOICE_MODE==='voice'?'Voice':VOICE_MODE==='text'?'Text':'Both')+' • '+(LANG==='ta-IN'?'Tamil':LANG==='hi-IN'?'Hindi':LANG==='te-IN'?'Telugu':LANG==='kn-IN'?'Kannada':'English');
+  document.getElementById('pref-voice').value=VOICE_MODE; document.getElementById('pref-lang').value=LANG; document.getElementById('pref-phone').value=PHONE;
+  document.getElementById('quick-voice').value=VOICE_MODE; document.getElementById('quick-lang').value=LANG;
+  try{ document.getElementById('ob-phone').value=PHONE; document.getElementById('ob-lang').value=LANG; }catch{}
+  ['voice','text','both'].forEach(x=>{ const b=document.getElementById('sel-'+x); if(b) b.className = (x===VOICE_MODE? 'px-3 py-1 rounded-full text-xs flex items-center gap-1 bg-cyan-500 text-white' : 'px-3 py-1 rounded-full text-xs flex items-center gap-1 text-white/60 hover:text-white'); });
+}
+async function persistPrefs(){
+  try{ const r=await fetch(API+'/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,voice_mode:VOICE_MODE,language:LANG})}); const j=await r.json(); log('cognee','Prefs saved → Cognee'); return j;}catch(e){ log('api','Prefs local only: '+e.message)}
+}
+async function loadPrefs(){
+  try{ const r=await fetch(API+'/preferences?phone='+PHONE); if(!r.ok) throw 0; const j=await r.json(); VOICE_MODE=j.preferences.voice_mode||VOICE_MODE; LANG=j.preferences.language||LANG; localStorage.setItem('voice_mode',VOICE_MODE); localStorage.setItem('lang',LANG); syncPrefUI(); log('api','Prefs loaded: '+VOICE_MODE+' • '+LANG);}catch{}
+}
+function quickVoice(v){ VOICE_MODE=v; localStorage.setItem('voice_mode',v); persistPrefs(); syncPrefUI(); }
+function quickLang(v){ LANG=v; localStorage.setItem('lang',v); persistPrefs(); syncPrefUI(); }
+async function savePrefs(){
+  VOICE_MODE=document.getElementById('pref-voice').value; LANG=document.getElementById('pref-lang').value; PHONE=document.getElementById('pref-phone').value.trim()||PHONE;
+  localStorage.setItem('phone',PHONE); localStorage.setItem('voice_mode',VOICE_MODE); localStorage.setItem('lang',LANG);
+  const j=await persistPrefs(); document.getElementById('pref-status').textContent='Saved: '+JSON.stringify(j.preferences||{}); syncPrefUI();
 }
 
-async function refreshState(){
-  try{
-    const r = await fetch(API + '/state'); const j = await r.json();
-    const st = j.stock_on_hand || {};
-    document.getElementById('stockTomato').textContent = st.tomato != null ? st.tomato : '—';
-    document.getElementById('stockCoriander').textContent = st.coriander != null ? st.coriander : '—';
-    const w = j.weather || {};
-    document.getElementById('wLine').textContent =
-      (w.rain_prob != null ? Math.round(w.rain_prob * 100) + '% rain · ' : '') + (w.city || '') + ' (' + (w.source || '') + ')';
-    document.getElementById('gRain').textContent = 'rain ' + Math.round((w.rain_prob || 0) * 100) + '% (' + (w.source || '') + ')';
-    document.getElementById('gStock').textContent = 'stock ' + (st.tomato != null ? st.tomato + 'kg' : '—') + ' · ' + (st.coriander != null ? st.coriander + ' bunches' : '—');
-    lastOrders = j.orders || [];
-    markDelivered();
-    renderLedger(j);
-  }catch(e){ /* state is a nice-to-have; never break the demo */ }
+// CHAT
+function bubbleMe(text, isVoice){
+  const c=document.getElementById('chat');
+  const d=document.createElement('div'); d.className='flex justify-end gap-2';
+  d.innerHTML='<div class=\"bubble-user px-4 py-2.5 rounded-2xl rounded-tr-none text-sm max-w-[78%] '+(isVoice?'border border-violet-400/30':'')+'\">'+esc(text)+(isVoice?' <span class=\"ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full\">🎤 voice</span>':'')+'</div>';
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
 }
-
-function markDelivered(){
-  // ↑ marker on SKUs that received a delivered order (latest order per product)
-  const seen = {};
-  (lastOrders || []).forEach(o => { if (!seen[o.product]) seen[o.product] = o; });
-  document.getElementById('upTomato').textContent = seen.tomato ? '↑ delivered' : '';
-  document.getElementById('upCoriander').textContent = seen.coriander ? '↑ delivered' : '';
-}
-
-function renderLedger(state){
-  const box = document.getElementById('ledgerBox');
-  if (!state.orders || !state.orders.length){
-    box.textContent = 'No orders yet. Run the demo to see stock move and memory update.'; return;
+function bubbleAI(text, withVoice, options){
+  const c=document.getElementById('chat');
+  const id='spk-'+Date.now();
+  const d=document.createElement('div'); d.className='flex gap-3';
+  let chips='';
+  if(options && options.length){
+    chips='<div class=\"mt-3 flex flex-wrap gap-1.5\">'+options.map(o=>{
+      const prim=o.primary?'bg-cyan-500 text-white border-cyan-400':'bg-white/10 text-white/80 border-white/15 hover:bg-white/15';
+      return '<button onclick=\"sendOption(\''+escAttr(o.value)+'\')\" class=\"px-3 py-1.5 rounded-full text-xs border '+prim+'\">'+esc(o.label)+'</button>';
+    }).join('')+'</div>';
   }
-  box.textContent = state.orders.map(o =>
-    `✔ ${o.at}  ${o.name_tn || o.product}  ${o.qty} ${o.unit}\n` +
-    `   supplier: ${o.supplier} · Rs.${o.total_inr}\n` +
-    `   stock on hand: ${o.stock_before} → ${o.stock_after}  (memory updated)`
-  ).join('\n\n');
+  d.innerHTML='<div class=\"w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0\"><i class=\"fa-solid fa-sparkles text-xs\"></i></div><div class=\"bubble-ai px-4 py-3 rounded-2xl rounded-tl-none text-sm max-w-[78%]\"><div>'+esc(text).replace(/\n/g,'<br>')+'</div>'+chips+'<div class=\"mt-2 flex items-center gap-2\"><button onclick=\"speak(\''+id+'\')\" class=\"px-2 py-1 rounded-full bg-white/10 text-xs\"><i class=\"fa-solid fa-volume-high mr-1\"></i> Play voice</button>'+(withVoice?'<span class=\"text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30\">🎤 voice on WhatsApp</span>':'')+'<span class=\"ml-auto text-[10px] text-white/40\">Tap option or speak</span></div><div id=\"'+id+'\" data-text=\"'+escAttr(text)+'\" class=\"hidden\"></div></div>';
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
 }
+function sendOption(v){ document.getElementById('input').value=v; send(); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
+function fill(t){ document.getElementById('input').value=t; document.getElementById('input').focus(); }
 
-async function refreshWhatsapp(){
-  const box = document.getElementById('waBox');
-  const mode = document.getElementById('waMode');
+async function send(){
+  const inp=document.getElementById('input'); const text=inp.value.trim(); if(!text) return;
+  inp.value=''; bubbleMe(text,false);
+  const t0=performance.now();
   try{
-    const j = await (await fetch(API + '/whatsapp/status')).json();
-    mode.textContent = j.mode === 'live' ? 'live' : 'mock';
-    mode.className = 'chip ' + (j.mode === 'live' ? 'det' : 'warn');
-    mode.title = j.mode === 'live'
-      ? 'Verified recipient configured — real WhatsApp sends'
-      : 'TWILIO_WHATSAPP_TO not set — sends are logged to data/mock_whatsapp.log instead (labeled)';
-    const lm = j.last_message || {};
-    const ld = j.last_dispatch || {};
-    const st = lm.status || 'unknown';
-    const line1 = 'mode: ' + j.mode + (j.recipient ? ' · to ' + j.recipient.replace('whatsapp:', '') : '') + '\n';
-    const line2 = 'last message: ' + st + (lm.error_code ? ' (error ' + lm.error_code + ')' : '') +
-                  (lm.date ? ' · ' + lm.date : '') + (lm.source ? ' · via ' + lm.source : '') + '\n';
-    const line3 = ld.product ? ('last order: ' + ld.qty + ' ' + (ld.unit || '') + ' ' + ld.product +
-                  (ld.total_inr != null ? ' · Rs.' + ld.total_inr : '') +
-                  (ld.message_sid ? ' · ' + ld.message_sid : '')) : 'no order sent yet this session';
-    box.textContent = line1 + line2 + line3;
-  }catch(e){
-    mode.textContent = 'unknown';
-    box.textContent = 'WhatsApp status unavailable: ' + e.message;
-  }
+    const r=await fetch(API+'/copilot/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,text,channel:'simulate'})});
+    const j=await r.json();
+    const ms=Math.round(performance.now()-t0);
+    document.getElementById('latency-badge').textContent=ms+' ms'; document.getElementById('latency-badge').classList.remove('hidden');
+    const reply=j.reply||j.confirm||j.ask||JSON.stringify(j).slice(0,400);
+    LAST_REPLY=reply; bubbleAI(reply, !!j.send?.voice, j.options);
+    log('sarvam','Intent: '+(j.status||'?')+' lang='+j.language||''); if(j.cognee_context) log('cognee','Context: '+j.cognee_context.slice(0,80)); else log('cognee','Memory queued'); log('n8n', j.send?('transport: '+(j.send.transport||'?')):'—');
+    if((VOICE_MODE==='voice'||VOICE_MODE==='both') && document.getElementById('auto-voice').checked) speakText(reply);
+  }catch(e){ log('api','Error: '+e.message); bubbleAI('Error: '+e.message,false,[]); }
 }
+document.getElementById('input').addEventListener('keydown',e=>{ if(e.key==='Enter') send(); });
 
-async function resetDemo(){
-  try{
-    await fetch(API + '/demo/reset', { method: 'POST' });
-    tokens = {}; lastBasket = null;
-    document.getElementById('itemsBox').innerHTML = '';
-    document.getElementById('transcriptLine').innerHTML = '';
-    document.getElementById('btnDispatch').disabled = true;
-    document.getElementById('btnMicApprove').disabled = true;
-    document.getElementById('btnApproveTyped').disabled = true;
-    stepsReset();
-    log('Demo state reset — seeded inventory restored');
-    refreshState(); refreshWhatsapp();
-  }catch(e){ log('Reset failed: ' + e.message); }
-}
-
-/* ── Mic capture: MediaRecorder → webm/opus → /stt (language from selector) ── */
-async function toggleMic(mode){
-  micMode = mode || 'command';
-  if (mediaRecorder && mediaRecorder.state === 'recording'){ mediaRecorder.stop(); return; }
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-    chunks = [];
-    mediaRecorder.ondataavailable = e => chunks.push(e.data);
-    mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const btnId = micMode === 'approve' ? 'btnMicApprove' : 'btnMic';
-      const b = document.getElementById(btnId);
-      b.classList.remove('recording');
-      b.textContent = micMode === 'approve' ? '🎙 Approve — say “சரி”' : '🎙 Record command';
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      log('Mic: ' + (blob.size / 1024).toFixed(0) + ' KB webm captured');
-      if (micMode === 'approve'){ await sttApprove(blob); } else { await sttCommand(blob); }
-    };
-    mediaRecorder.start();
-    const b = micMode === 'approve' ? document.getElementById('btnMicApprove') : document.getElementById('btnMic');
-    b.classList.add('recording'); b.textContent = '⏹ Stop';
-    log('Recording… speak now (' + sttLang() + ')');
-  }catch(e){ log('Mic error: ' + e.message + ' — use typed fallback'); }
-}
-async function sttCommand(blob){
-  step('s0', 'run');
-  const fd = new FormData(); fd.append('file', blob, 'audio.webm');
-  try{
-    const r = await fetch(API + '/stt?language_code=' + encodeURIComponent(sttLang()), { method: 'POST', body: fd });
-    if (!r.ok){ const j = await r.json().catch(() => ({})); throw new Error(j.detail || r.status); }
-    const j = await r.json();
-    document.getElementById('transcriptLine').innerHTML = '<b>Transcript:</b> ' + esc(j.transcript);
-    log('STT [' + sttLang() + ']: ' + j.transcript);
-    await runPipeline(j.transcript);
-  }catch(e){ step('s0'); log('STT failed (' + e.message + ') — typed-transcript fallback (labeled)'); }
-}
-async function sttApprove(blob){
-  const fd = new FormData(); fd.append('file', blob, 'audio.webm');
-  try{
-    const r = await fetch(API + '/stt?language_code=' + encodeURIComponent(sttLang()), { method: 'POST', body: fd });
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
-    log('STT approve heard: ' + j.transcript);
-    await approveVoice(j.transcript);
-  }catch(e){ log('STT approve failed — use typed fallback'); }
-}
-function playCached(){
-  const p = document.getElementById('cmdPlayer');
-  p.src = 'assets/command_ta.wav?v=4';
-  p.play().catch(() => log('No assets/command_ta.wav — crew records the Tamil command into ui/assets/'));
-  log('Playing cached demo audio (labeled synthetic backup)');
-}
-
-/* ── Pipeline: transcript → intent → basket rec ── */
-async function runPipeline(transcript){
-  transcript = (transcript || '').trim();
-  if (!transcript){ log('Empty transcript'); return; }
-  step('s0', 'ok'); step('s1b', 'run');
-  log('POST /intent');
-  const ir = await fetch(API + '/intent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript }) });
-  const intent = await ir.json();
-  log('Intent [' + (intent.engine || 'rules') + ']: ' + JSON.stringify(intent));
-  if (intent.injection_detected) log('⚠ Injection attempt refused (merchant speech is data, not instructions)');
-  if (intent.intent !== 'create_restock_order'){
-    step('s1b');
-    document.getElementById('transcriptLine').innerHTML = '<b>Heard:</b> “' + esc(transcript) + '” → <i>' +
-      (intent.intent === 'decline' ? 'declined — nothing ordered' : esc(intent.intent)) + '</i>';
+// VOICE: mic → /stt → copilot → TTS
+let rec, chunks=[];
+const micBtn=document.getElementById('mic'), wave=document.getElementById('wave');
+micBtn.addEventListener('click', async()=>{
+  if(micBtn.classList.contains('rec')){
+    try{ rec.stop(); }catch{}
     return;
   }
-  if (intent.clarification_needed) log('Note: some quantities not stated — engine fills from the deterministic formula');
-  const br = await fetch(API + '/rec/basket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: intent.products }) });
-  lastBasket = await br.json();
-  renderBasket();
-  step('s1b', 'ok');
-  document.getElementById('btnMicApprove').disabled = false;
-  document.getElementById('btnApproveTyped').disabled = false;
-  await speakAsk();
-  upgradeAsk();   // Sarvam rewrites the same, engine-locked numbers
-}
-function unitTn(u){ return u === 'kg' ? 'கிலோ' : 'கொத்து'; }
-function renderBasket(){
-  const box = document.getElementById('itemsBox'); box.innerHTML = '';
-  lastBasket.items.forEach(it => {
-    const d = document.createElement('div'); d.className = 'item';
-    d.innerHTML = '<b class="tn">' + esc(it.name_tn || it.product) + '</b> <span class="chip det">' + esc(it.product) + '</span>' +
-      ' — she asked ' + (it.requested == null ? '—' : esc(it.requested)) +
-      ' → engine: <b style="color:var(--green-d)">' + esc(it.recommended_qty) + ' ' + esc(it.unit) + '</b> · ₹' + esc(it.total_inr) +
-      '<br><small>' + it.factors.map(f => esc(f.source) + ': ' + esc(f.fact)).join(' · ') + '</small>';
-    box.appendChild(d);
-  });
-  const t = document.createElement('div'); t.className = 'total-line';
-  t.innerHTML = '<span>Basket total</span><span>₹' + esc(lastBasket.basket_total_inr) + '</span>';
-  box.appendChild(t);
-  const out = lastBasket.items.map(i => i.recommended_qty + ' ' + i.unit).join(' + ');
-  document.getElementById('graphOut').textContent = out + ' → ₹' + lastBasket.basket_total_inr;
-  document.getElementById('gStock').textContent = 'stock ' + lastBasket.items.map(i => (i.name_tn || i.product) + ' ' + i.stock_on_hand).join(' · ');
-  log('Basket: ' + lastBasket.items.map(i => i.product + ' ' + i.recommended_qty + i.unit).join(', ') + ' = ₹' + lastBasket.basket_total_inr);
-}
-async function speakAsk(){
   try{
-    const t = await fetch(API + '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: lastBasket.ask, lang: 'ta-IN' }) });
-    if (t.ok){ const b = await t.blob(); const u = URL.createObjectURL(b); const p = document.getElementById('player'); p.src = u; p.style.display = 'block'; p.play(); }
-    else { const j = await t.json().catch(() => ({})); log('TTS skipped: ' + (j.detail || t.status)); }
-  }catch(e){ log('TTS fallback: ' + e.message); }
-}
-async function upgradeAsk(){
-  try{
-    const r = await fetch(API + '/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products: Object.fromEntries(lastBasket.items.map(i => [i.product, i.requested])) }) });
-    if (!r.ok) return;
-    const j = await r.json();
-    if (j.source === 'template-fallback') return;
-    log('Sarvam explanation (' + j.source + '): ' + j.text);
-    const el = document.getElementById('transcriptLine');
-    el.innerHTML += '<br><b>Sarvam-105B says:</b> <span class="tn">' + esc(j.text) + '</span>';
-  }catch(e){ /* template ask is already spoken; uplift is optional */ }
-}
-
-/* ── Approval gate ── */
-async function approveVoice(transcript){
-  if (!lastBasket){ log('Nothing to approve yet'); return; }
-  step('s2', 'run');
-  const items = lastBasket.items.map(i => ({ product: i.product, qty: i.recommended_qty }));
-  const r = await fetch(API + '/voice/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript, items, basket_total_inr: lastBasket.basket_total_inr }) });
-  const j = await r.json();
-  log('Approve (' + transcript + '): ' + JSON.stringify(j));
-  if (j.status === 'approved'){
-    j.items.forEach(it => tokens[it.product] = it.approval_token);
-    step('s2', 'ok'); document.getElementById('btnDispatch').disabled = false;
-  } else if (j.status === 'declined' || j.status === 'needs_confirmation'){
-    step('s2'); log('Not approved — no order moves (gate held)');
-  } else { step('s2'); log('Approve failed: ' + (j.reason || j.status)); }
-}
-
-/* ── Dispatch (single-use tokens; duplicates refused server-side) ── */
-async function dispatchAll(){
-  if (!lastBasket){ log('Nothing to dispatch'); return; }
-  step('s3', 'run');
-  const box = document.getElementById('n8nBox'); box.textContent = '';
-  for (const it of lastBasket.items){
-    const token = tokens[it.product];
-    if (!token){ log('No token for ' + it.product); continue; }
-    const r = await fetch(API + '/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approval_token: token, total_inr: it.total_inr }) });
-    const j = await r.json();
-    box.textContent += JSON.stringify(j, null, 1) + '\n';
-    if (j.status === 'dispatched'){
-      const rec = j.record || {};
-      log('Dispatched ' + it.product + ' → n8n ' + (rec.n8n || 'not configured') +
-          ', WhatsApp ' + (rec.twilio_status || 'n/a') + (rec.twilio_sid ? ' (' + rec.twilio_sid + ')' : '') +
-          ', stock ' + rec.stock_before + '→' + rec.stock_after + ', memory updated');
-      refreshWhatsapp();
-    } else { log('Dispatch ' + it.product + ': ' + j.status + ' — ' + (j.reason || '')); }
-  }
-  step('s3', 'ok');
-  refreshState();
-  step('s4', 'ok');
-  log('Second click would be refused: idempotency (FAILPATH #4)');
-}
-
-/* ── Quick demo helpers — one click per language ── */
-const QUICK_TEXT = {
-  ta: 'நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி',
-  kn: 'ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ',
-  hi: 'कल 20 किलो टमाटर, 10 गुच्छे धनिया',
-  te: 'రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు',
-  en: 'tomato 20kg and 10 bunches coriander for tomorrow'
-};
-function quickDemo(lang){
-  document.getElementById('langSel').value = lang === 'en' ? 'en-IN' : lang + '-IN';
-  document.getElementById('typedCmd').value = QUICK_TEXT[lang];
-  runPipeline(QUICK_TEXT[lang]);
-}
-async function runFullAuto(){
-  log('⚡ Full Auto Demo — running Tamil 20+10 → 20+6 → approve → dispatch → WhatsApp');
-  const t = QUICK_TEXT.ta;
-  document.getElementById('langSel').value = 'ta-IN';
-  document.getElementById('typedCmd').value = t;
-  await runPipeline(t);
-  let tries = 0;
-  const iv = setInterval(async () => {
-    tries++;
-    if (lastBasket && !document.getElementById('btnApproveTyped').disabled){
-      clearInterval(iv);
-      log('Auto-approving சரி…');
-      await approveVoice('சரி');
-      setTimeout(async () => {
-        if (!document.getElementById('btnDispatch').disabled){
-          log('Auto-dispatching…');
-          await dispatchAll();
-          log('✅ Full Auto complete — ₹546 dispatched, ledger updated');
-        }
-      }, 400);
-    }
-    if (tries > 20){ clearInterval(iv); log('Auto timed out — use manual steps'); }
-  }, 300);
-}
-
-/* ── Grounded reasoning (P2) ── */
-async function doReason(){
-  log('POST /reason (grounded reasoning over real observations)');
-  try{
-    const r = await fetch(API + '/reason', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product: 'tomato', requested_qty: 20 }) });
-    const j = await r.json();
-    const box = document.getElementById('recallBox');
-    box.style.display = 'block';
-    box.textContent =
-      'OBSERVATIONS (fetched by the API):\n' + j.observations.map(o => '  ' + o.tool + '(' + o.args + ') -> ' + o.result).join('\n') +
-      '\n\nREASONING [' + j.source + ']:\n  ' + j.reasoning +
-      '\n\nmemory_note: ' + (j.memory_note || '') + '\nquantities_from: ' + j.quantities_from;
-  }catch(e){ log('Reason failed: ' + e.message); }
-}
-
-/* ── Soundbox briefing — simulated rail ── */
-async function loadSoundbox(){
-  try{
-    const r = await fetch(API + '/soundbox/briefing'); const j = await r.json();
-    document.getElementById('soundboxBox').textContent = JSON.stringify(j, null, 2);
-  }catch(e){ document.getElementById('soundboxBox').textContent = 'Soundbox briefing (offline): Vanakkam Lakshmi! Naalai 78% mazhai — demo fallback'; }
-}
-async function playSoundbox(){
-  try{
-    const b = await fetch(API + '/soundbox/briefing').then(r => r.json());
-    const t = await fetch(API + '/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: b.text, lang: 'ta-IN' }) });
-    if (t.ok){ const blob = await t.blob(); const url = URL.createObjectURL(blob); const p = document.getElementById('soundboxPlayer'); p.src = url; p.style.display = 'block'; p.play(); log('Soundbox: briefing playing (simulated rail)'); }
-    else { log('Soundbox TTS skipped — typed briefing shown above'); }
-  }catch(e){ log('Soundbox play failed: ' + e.message); }
-}
-
-/* ── Cognee recall via API (key stays server-side) ── */
-async function doRecall(){
-  const box = document.getElementById('recallBox');
-  box.style.display = 'block'; box.textContent = 'Querying Cognee graph (up to ~60s)…';
-  log('Cognee recall: Why this order?');
-  try{
-    const r = await fetch(API + '/cognee/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'Why 20 kg tomato and 6 bunches coriander?' }) });
-    const j = await r.json();
-    if (j.error){
-      box.innerHTML = '<img src="../cognee/graph_fallback.svg" style="width:100%;background:#0F172A;border-radius:8px;padding:8px">' +
-        '<div style="margin-top:6px">Cognee unavailable (' + esc(j.error) + ') — showing labeled local graph fallback.</div>';
-      return;
-    }
-    const results = (j.results || []).map(x => x.text || JSON.stringify(x)).join('\n\n');
-    box.textContent = 'COGNEE (' + j.source + ', ' + j.elapsed_s + 's, graph_completion):\n\n' + results.slice(0, 1500);
-    log('Cognee recall ok in ' + j.elapsed_s + 's');
-  }catch(e){ log('Recall failed: ' + e.message); box.innerHTML = '<img src="../cognee/graph_fallback.svg" style="width:100%">'; }
-}
-
-// ── Copilot Chat (mirrors WhatsApp brain — same /copilot/simulate) ──
-const COPILOT_PHONE = '917010919624';
-function copilotPhone(){ const el=document.getElementById('copilotPhoneInput'); const v=(el && el.value || COPILOT_PHONE).replace(/\D/g,''); return v || COPILOT_PHONE; }
-function copilotAddBubble(role, text, meta){
-  const box = document.getElementById('copilotChatBox');
-  const b = document.createElement('div'); b.className = 'bubble ' + role;
-  if (meta && role === 'bot'){
-    if (meta.status === 'awaiting_approval') b.classList.add('awaiting');
-    if (meta.status === 'dispatched') b.classList.add('dispatched');
-  }
-  b.innerHTML = esc(text) + (meta ? '<div class="meta">' + esc(meta) + '</div>' : '');
-  box.appendChild(b); box.scrollTop = box.scrollHeight;
-}
-async function copilotSend(){
-  const inp = document.getElementById('copilotInput');
-  const text = (inp.value || '').trim();
-  if (!text){ return; }
-  inp.value = '';
-  copilotAddBubble('user', text, 'you · ' + sttLang());
-  log('Copilot send: ' + text);
-  try{
-    const phone = copilotPhone();
-  const r = await fetch(API + '/copilot/simulate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, text }) });
-    const j = await r.json();
-    let botText = '';
-    let meta = j.engine + ' · ' + j.status;
-    if (j.status === 'awaiting_approval'){
-      botText = j.ask || JSON.stringify(j.items);
-      meta += ' · ₹' + j.basket_total_inr;
-      // Enrich with Sarvam explanation (best response)
+    const s=await navigator.mediaDevices.getUserMedia({audio:true});
+    rec=new MediaRecorder(s,{mimeType: MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/wav'});
+    chunks=[];
+    rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+    rec.onstop=async()=>{
+      micBtn.classList.remove('rec'); wave.classList.add('hidden'); micBtn.innerHTML='<i class=\"fa-solid fa-microphone\"></i>';
+      s.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(chunks,{type: rec.mimeType||'audio/webm'});
+      if(!blob.size){ log('voice','Empty recording'); return; }
+      bubbleMe('🎤 voice note ('+Math.round(blob.size/1024)+' KB)', true);
+      log('voice','STT… ('+LANG+')');
       try{
-        const er = await fetch(API + '/explain', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ products: j.items ? Object.fromEntries(j.items.map(i=>[i.product, null])) : j.products }) });
-        const ej = await er.json();
-        if (ej.text) botText += '\n\n— ' + ej.text;
-      }catch(e){}
-      document.getElementById('copilotEngine').textContent = 'engine: ' + j.engine + ' · ' + j.status;
-    } else if (j.status === 'dispatched'){
-      botText = j.confirm || 'dispatched';
-      meta += ' · ' + (j.dispatched||[]).length + ' items';
-      document.getElementById('copilotEngine').textContent = 'engine: dispatched ✅';
-      refreshState(); refreshWhatsapp();
-    } else if (j.status === 'unknown_caller'){
-      botText = 'HarvestWise: unknown caller — not allowlisted.';
-    } else if (j.status === 'injection_blocked'){
-      botText = 'HarvestWise: speech refused — embedded instructions were ignored.';
-    } else if (j.status === 'no_intent'){
-      botText = 'HarvestWise: I did not catch a product. Try: நாளை 20 கிலோ தக்காளி.';
-    } else {
-      botText = JSON.stringify(j, null, 2);
-    }
-    copilotAddBubble('bot', botText, meta);
-    log('Copilot [' + j.status + ']: ' + botText.slice(0,120));
-    if (j.status === 'awaiting_approval') copilotAddBubble('bot', 'Tip: reply "சரி" to approve → stock 12→32', 'hint');
-  }catch(e){ copilotAddBubble('bot', 'Copilot error: ' + e.message, 'error'); }
-}
-function copilotQuick(lang){ const t = QUICK_TEXT[lang] || QUICK_TEXT.ta; document.getElementById('copilotInput').value = t; copilotSend(); }
-function copilotApprove(){ document.getElementById('copilotInput').value = 'சரி'; copilotSend(); }
-function copilotReset(){ document.getElementById('copilotChatBox').innerHTML = ''; fetch(API + '/demo/reset', { method:'POST' }).then(()=>{ refreshState(); log('Copilot reset — demo state cleared'); }); }
-let copilotRecorder = null, copilotChunks = [];
-async function copilotMic(){
-  const btn = document.getElementById('copilotMic');
-  if (copilotRecorder && copilotRecorder.state === 'recording'){ copilotRecorder.stop(); return; }
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    copilotRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-    copilotChunks = [];
-    copilotRecorder.ondataavailable = e => copilotChunks.push(e.data);
-    copilotRecorder.onstop = async () => {
-      stream.getTracks().forEach(t=>t.stop());
-      btn.textContent = '🎙'; btn.classList.remove('recording');
-      const blob = new Blob(copilotChunks, { type: 'audio/webm' });
-      log('Copilot mic: ' + (blob.size/1024).toFixed(0) + ' KB');
-      const fd = new FormData(); fd.append('file', blob, 'audio.webm');
-      try{
-        const r = await fetch(API + '/stt?language_code=' + encodeURIComponent(sttLang()), { method:'POST', body: fd });
-        const j = await r.json();
-        document.getElementById('copilotInput').value = j.transcript;
-        copilotSend();
-      }catch(e){ copilotAddBubble('bot','STT failed — type your message', 'error'); }
+        const fd=new FormData(); fd.append('file', blob, 'audio.webm');
+        const r=await fetch(API+'/stt?language_code='+encodeURIComponent(LANG),{method:'POST',body:fd});
+        if(!r.ok){ const t=await r.text(); throw new Error(r.status+': '+t.slice(0,120)); }
+        const j=await r.json(); const transcript=j.transcript||'';
+        log('sarvam','Transcript: \"'+transcript.slice(0,80)+'\"');
+        if(!transcript){ bubbleAI('Could not transcribe. Try again or type.',false); return; }
+        // send transcript to copilot
+        const t0=performance.now();
+        const cr=await fetch(API+'/copilot/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,text:transcript,channel:'simulate'})});
+        const cj=await cr.json();
+        const ms=Math.round(performance.now()-t0);
+        document.getElementById('latency-badge').textContent=ms+' ms'; document.getElementById('latency-badge').classList.remove('hidden');
+        const reply=cj.reply||cj.confirm||cj.ask||JSON.stringify(cj).slice(0,400);
+        LAST_REPLY=reply; bubbleAI(reply, !!cj.send?.voice, cj.options);
+        log('sarvam','Intent: '+cj.status+' lang='+cj.language||''); log('cognee','Memory queued');
+        if((VOICE_MODE==='voice'||VOICE_MODE==='both') && document.getElementById('auto-voice').checked) speakText(reply);
+      }catch(e){ log('voice','STT failed: '+e.message); bubbleAI('Voice failed: '+e.message+'. Typed fallback: type your message.',false); }
     };
-    copilotRecorder.start(); btn.textContent = '⏹'; btn.classList.add('recording'); log('Copilot recording… (' + sttLang() + ')');
-  }catch(e){ log('Mic error: ' + e.message); }
-}
-// Seed copilot chat with hint
-setTimeout(()=> copilotAddBubble('bot', 'Vanakkam Lakshmi! Try: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி" — I will reply exactly like WhatsApp, with engine quantities + Sarvam explanation.', 'HarvestWise copilot · deterministic engine · 78% rain → ₹546'), 600);
+    rec.start(); micBtn.classList.add('rec'); wave.classList.remove('hidden'); micBtn.innerHTML='<i class=\"fa-solid fa-stop\"></i>';
+    log('voice','Recording… tap to stop');
+  }catch(e){ log('voice','Mic denied: '+e.message); }
+});
 
-async function refreshCopilotState(){
+// TTS: Sarvam /tts (audio/wav) with browser fallback
+async function speakText(text){
+  const langPref = LANG;
   try{
-    const j = await (await fetch(API + '/copilot/state')).json();
-    const t = j.transports || {};
-    document.getElementById('copilotTransport').textContent = (t.wa_akg ? 'wa-akg ' : '') + (t.twilio_freeform ? 'twilio ' : '') + 'mock · pending:' + Object.keys(j.pending_orders||{}).length;
-  }catch(e){}
+    const r=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text: text.slice(0,900), lang: langPref})});
+    if(r.ok && r.headers.get('content-type')?.includes('audio')){
+      const buf=await r.arrayBuffer(); const blob=new Blob([buf],{type:'audio/wav'});
+      const url=URL.createObjectURL(blob); const a=new Audio(url);
+      LAST_AUDIO=a; a.onended=()=>URL.revokeObjectURL(url);
+      await a.play(); log('voice','Sarvam TTS playing ('+langPref+')'); return;
+    }
+    throw new Error('no audio');
+  }catch{
+    // low-latency browser fallback (<1s, no network)
+    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text.slice(0,900)); const map={'ta-IN':'ta-IN','hi-IN':'hi-IN','te-IN':'te-IN','kn-IN':'kn-IN','en-US':'en-US'}; u.lang=map[langPref]||'en-US'; u.rate=0.95; speechSynthesis.speak(u); log('voice','Browser TTS fallback'); }catch(e){ log('voice','TTS unavailable'); }
+  }
 }
-check(); refreshState(); refreshWhatsapp(); loadSoundbox(); refreshCopilotState();
-setInterval(refreshWhatsapp, 30000);
-setInterval(refreshState, 5000);
-setInterval(refreshCopilotState, 5000);
+function speak(id){ const el=document.getElementById(id); if(el) speakText(el.dataset.text||''); }
+function playLast(){ if(LAST_REPLY) speakText(LAST_REPLY); if(LAST_AUDIO) LAST_AUDIO.play().catch(()=>{}); }
+
+// NAV
+function nav(name){
+  document.querySelectorAll('[data-nav]').forEach(b=>{ b.classList.remove('side-active'); b.classList.add('text-white/60'); });
+  document.querySelector('[data-nav=\"'+name+'\"]').classList.add('side-active'); document.querySelector('[data-nav=\"'+name+'\"]').classList.remove('text-white/60');
+  document.querySelectorAll('section[id^=\"view-\"]').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('view-'+name).classList.remove('hidden');
+  document.getElementById('page-title').textContent={copilot:'Copilot Chat',whatsapp:'WhatsApp Live',growth:'Growth Partner',inventory:'Inventory & Weather',memory:'Memory Graph',prefs:'Preferences'}[name]||name;
+  if(name==='inventory') loadInventory();
+  if(name==='memory') loadMemory();
+  if(name==='whatsapp') loadWaHealth();
+}
+
+// REMOTE
+async function loadInventory(){
+  try{ const [st, mem]=await Promise.all([fetch(API+'/state?merchant_id=lakshmi').then(r=>r.json()), fetch(API+'/memory').then(r=>r.json())]);
+    document.getElementById('inv').innerHTML='<div class=\"grid grid-cols-2 gap-3 text-xs\"><div class=\"card p-3\">Weather: '+(st.weather? (st.weather.rain_prob*100).toFixed(0)+'% rain ('+st.weather.source+')':'—')+'</div><div class=\"card p-3\">Stock: '+(st.stock? JSON.stringify(st.stock): JSON.stringify(st.stock_on_hand||st))+'</div></div><pre class=\"mt-3 text-[11px] font-mono whitespace-pre-wrap bg-black/20 p-2 rounded-lg\">'+JSON.stringify(st,null,2).slice(0,2000)+'</pre>';
+  }catch(e){ document.getElementById('inv').textContent='Error: '+e.message; }
+}
+async function loadMemory(){
+  try{ const [ctx, mem]=await Promise.all([fetch(API+'/cognee/context?phone='+PHONE).then(r=>r.json()).catch(()=>({})), fetch(API+'/memory').then(r=>r.json()).catch(()=>({}))]);
+    document.getElementById('ctx').textContent=ctx.context||'(cache cold — will warm after first message)';
+    document.getElementById('mem').textContent=JSON.stringify(mem,null,2).slice(0,3000);
+  }catch(e){ document.getElementById('ctx').textContent='Error: '+e.message; }
+}
+async function loadWaHealth(){
+  try{ const h=await fetch(API+'/health').then(r=>r.json()); document.getElementById('wa-health').textContent=JSON.stringify({wa_akg: h.copilot?.wa_akg, cognee: h.cognee, sarvam: h.sarvam_key, weather: h.weather_mode}, null, 2); }catch(e){ document.getElementById('wa-health').textContent='Error: '+e.message; }
+  try{ const h=await fetch(API+'/whatsapp/status').then(r=>r.json()).catch(()=>null); if(h) document.getElementById('wa-health').textContent+='\n\n'+JSON.stringify(h,null,2); }catch{}
+}
+async function refreshAll(){ loadPrefs(); loadInventory(); loadMemory(); loadWaHealth(); log('api','Refreshed'); }
+async function waSend(){
+  const t=document.getElementById('wa-text').value.trim(); if(!t) return;
+  document.getElementById('wa-result').textContent='Sending…';
+  try{ const r=await fetch(API+'/wa/inbound',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'message.received',data:{from:PHONE+'@s.whatsapp.net', content:t, type:'TEXT'}})}); const j=await r.json(); document.getElementById('wa-result').textContent='→ '+JSON.stringify(j.result||j).slice(0,300); log('n8n','WA-AKG send: '+(j.result?.send?.transport||'?')); }catch(e){ document.getElementById('wa-result').textContent='Error: '+e.message; }
+}
+async function waVoice(){
+  const t=document.getElementById('wa-text').value.trim()||'Vanakkam, check stock?'; if(!confirm('Send VOICE note for: \"'+t.slice(0,60)+'\"? (Sarvam TTS → WA-AKG /media)')) return;
+  document.getElementById('wa-result').textContent='TTS…';
+  try{
+    const tr=await fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t, lang: LANG})});
+    if(!tr.ok) throw new Error(await tr.text());
+    const buf=await tr.arrayBuffer();
+    // send via backend helper: we simulate by calling copilot with voice_mode=voice so backend sends audio note
+    const r=await fetch(API+'/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,voice_mode:'voice',language:LANG})});
+    const r2=await fetch(API+'/wa/inbound',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'message.received',data:{from:PHONE+'@s.whatsapp.net', content:t, type:'TEXT'}})});
+    const j=await r2.json(); document.getElementById('wa-result').textContent='Voice note queued: '+JSON.stringify(j.result?.send||j).slice(0,300);
+    await fetch(API+'/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,voice_mode:VOICE_MODE,language:LANG})});
+  }catch(e){ document.getElementById('wa-result').textContent='Error: '+e.message; }
+}
+async function waSim(){
+  const t=document.getElementById('wa-sim-input').value.trim(); if(!t) return;
+  document.getElementById('wa-sim-input').value='';
+  const box=document.getElementById('wa-chat'); const me=document.createElement('div'); me.className='text-right'; me.innerHTML='<span class=\"inline-block bg-emerald-600 text-white px-3 py-2 rounded-2xl rounded-tr-none\">'+esc(t)+'</span>'; box.appendChild(me);
+  try{ const r=await fetch(API+'/copilot/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:PHONE,text:t,channel:'simulate'})}); const j=await r.json(); const reply=j.reply||j.confirm||JSON.stringify(j).slice(0,400); const ai=document.createElement('div'); ai.innerHTML='<span class=\"inline-block bubble-ai px-3 py-2 rounded-2xl rounded-tl-none\">'+esc(reply)+'</span>'; box.appendChild(ai); box.scrollTop=box.scrollHeight; }catch(e){ const er=document.createElement('div'); er.textContent='Error: '+e.message; box.appendChild(er); }
+}
+
+// init
+(function(){
+  if(localStorage.getItem('phone')){ document.getElementById('onboard').classList.add('hidden'); }
+  syncPrefUI(); loadPrefs(); loadWaHealth();
+  // if prefs say hidden was wrong (cold), keep hidden state per localStorage
+})();
 </script>
 </body>
 </html>

@@ -208,13 +208,22 @@ def parse_intent(transcript: str) -> dict | None:
     if not parsed:
         return None
     intent = str(parsed.get("intent") or "").strip()
+    # FIX 2026-09-19: the P1 prompt emits a SINGULAR "product" key while the
+    # code read plural "products" — the LLM product-name assist was dead code.
+    raw_products = parsed.get("products") if isinstance(parsed.get("products"), dict) else None
+    if not raw_products:
+        single = parsed.get("product")
+        if isinstance(single, str) and single.strip().lower() not in ("", "null", "none", "null"):
+            raw_products = {single.strip(): None}
+        elif isinstance(single, dict):
+            raw_products = single
     return {
         "intent": intent if intent in VALID_INTENTS else "out_of_scope",
         "language": str(parsed.get("language") or "").strip() or None,
         "injection_detected": bool(parsed.get("injection_detected")),
         "clarification_needed": bool(parsed.get("clarification_needed")),
         "confidence": parsed.get("confidence"),
-        "raw_products": parsed.get("products") if isinstance(parsed.get("products"), dict) else None,
+        "raw_products": raw_products,
     }
 
 
@@ -292,7 +301,7 @@ def explain_ask(items: list[dict], rain_prob: float, language: str = "Tamil") ->
         f"Rain tomorrow: {int(rain_prob * 100)}%.\n"
         f"Engine-approved quantities (use these EXACTLY, do not change, do not omit any): {injected}.\n"
         f"Top factors: {'; '.join(f['fact'] for i in items for f in i.get('factors', [])[:3])}\n"
-        "Speak in Tamil. Mention EVERY item above with its exact number. "
+        f"Speak in {language}. Mention EVERY item above with its exact number. "
         "End by asking her to say 'சரி' to confirm. "
         "Do not mention any number that is not in the injected quantities."
     )

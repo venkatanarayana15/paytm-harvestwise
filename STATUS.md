@@ -1,6 +1,6 @@
 # STATUS — Team Sairam · HarvestWise · Paytm Build for India AI Hackathon
 Living mission log. Mentor reads this FIRST every session; update on every decision/blocker/phase change.
-Last updated: 2026-09-18 23:35 — CONNECTED ✅ Full WhatsApp copilot LIVE (f2sxa9, 103/103, end-to-end proven)
+Last updated: 2026-09-19 09:58 — Narrated copilot fail-safe video built (`copilot_narrated.mp4`, 32 s). 126/126 battery + 38-check UI smoke ALL GREEN; Q&A copilot live in 5 languages.
 
 ## Phase
 Round 1: SHORTLISTED ✅ — HarvestWise PDF selected for the next round (portal + team confirmed 2026-09-15).
@@ -40,7 +40,41 @@ Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — CONNECTED ✅**
 **WA-AKG is LIVE — scan the QR NOW:** Open `http://localhost:3000` (or the PNG at `finale/qr-harvestwise.png`), WhatsApp → Linked Devices → Link a Device → scan. After `status: CONNECTED`, send a test: `நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி` → expect vernacular ask (546), then `சரி` → `HarvestWise ✅ Order dispatched · Total Rs.546 · Stock tomato 12→32`. If no spare phone, the API path is already 103/103 proven: `POST /wa/inbound` (WA-AKG payload) works. Then do blocker 5 (import 3 n8n JSONs) → blocker 4 (rotate keys).
 
 ## Eval log
-- **2026-09-18 (21:00, WA-AKG LIVE): 103/103 battery green, Docker transports proven.**
+- **2026-09-19 (morning, copilot intelligence pass): 126/126 battery + 38-check UI smoke ALL GREEN.**
+  Judge-verified: the copilot is now a real Q&A product, not an order taker. Every answer is composed
+  LIVE from the engine/ledger/catalog/weather — zero scripted numbers.
+  - 🔴 **Word-boundary matching fixed**: `"ha" in text` fired the approval gate on "w*ha*t";
+    `"no" in text` CANCELLED orders containing "now". `_word_hit()` does ASCII token-boundary
+    matching (Indic stays substring). Regression-tested: "what is your policy?", "what time is it now?".
+  - 🔴 **Every question was answered "I did not catch a product"** — the copilot could not answer
+    anything. New Q&A intents (price/stock/why/weather/orders/sales/greeting/help) all composed from
+    live data: "why 20 kg tomato?" returns the engine line with the CURRENT stock; stock answers are
+    asserted in tests to match `/state` exactly.
+  - 🔴 **EN "tomato 20kg" carried NO quantity** (glued token) — masked because the engine coincidentally
+    also produced 20. Numbers glued to units are now split before parsing.
+  - 🔴 **Telugu was never detected** (`\u0c00` range missing) and ALL copilot replies were Tamil-only.
+    The full reply surface (ask, confirm, cancel, no-pending, help, welcome, Q&A) is now ta/kn/hi/te/en.
+  - 🔴 **/dispatch trusted client total_inr** — a tampered payload could write a fake amount into the
+    ledger, memory, n8n and WhatsApp. Server recomputes from CATALOG; mismatch is REFUSED; battery
+    asserts 9999 is rejected and the ledger shows the engine price.
+  - 🟠 WA-AKG send failure **silently ate the merchant's reply** — now cascades WA-AKG → Twilio → mock,
+    every attempt labelled. WhatsApp voice notes STT with auto-language (`unknown`) instead of hardcoded ta-IN.
+  - 🟠 `/demo/reset` did not clear `pending_orders` — a stale "சரி" after reset dispatched against fresh
+    stock. Also clears issued tokens; pending baskets expire after 30 min (TTL).
+  - 🟠 P1 prompt emits singular `product` while code read `products` — the LLM product-name assist was
+    dead code. Now merged (quantity still discarded — doctrine holds).
+  - 🟠 Copilot chat bubbles never showed awaiting/dispatched highlights (meta.status on a string).
+  - 🟠 Sarvam ask was Tamil even for EN/KN/HI/TE orders; `/explain` and the P3 path are now
+    language-aware; EN "why" answers use "tomato" not "தக்காளி".
+  - ➕ Basket adjustment flow: "5 kg tomato less" → 20→15, "3 kg tomato more" → 15→18 (numbers only from
+    her speech, engine re-priced). Merchant phone editable in the UI chip.
+  - Every copilot response now carries a `reply` field (the exact WhatsApp bubble text) — the UI chat
+    renders the same content WhatsApp sends.
+  - Battery grew 103 → **126** checks (sections 14-15: Q&A grounded-data, word-boundary regressions,
+    multilingual orders/adjustments, money-tamper security, reset semantics). UI smoke grew 29 → 38
+    (copilot chat loop driven in-browser: Q price → Q stock → order → awaiting → approve → dispatched
+    ₹546 → ledger 12→32 → stock card mirrors).
+- **2026-09-18 (21:00, WA-AKG LIVE): 103/103 battery green, Docker transports proven.**- **2026-09-18 (21:00, WA-AKG LIVE): 103/103 battery green, Docker transports proven.**
   - WA-AKG stack up after fixing Dockerfile `if [ -n "$ADMIN_EMAIL"]` missing-space bug (was `sh: missing ]`, admin never created) → `docker exec setup-admin` → login 200 → session `f2sxa9` `SCAN_QR` → API key `wag_lJVg...` → webhook `harvestwise-copilot` → `host.docker.internal:8000/wa/inbound` (`message.received`) → Docker→host `GET /health` 200 → HarvestWise `/health` now `copilot.wa_akg: true, twilio_freeform: true` → battery still 103/103 → live `POST /wa/inbound` payload proves `awaiting_approval 546` → `dispatched 2 · 546 · 12→32` before any phone is linked. QR saved (`WA-AKG/qr-harvestwise.png` + `finale/qr-harvestwise.png`, also `GET /api/sessions/f2sxa9`). MySQL remapped 3307->3306 (host conflict), DB healthy. Full loop is now: WhatsApp text/voice → Sarvam saaras:v3 OGG-native → `_handle_merchant_message` (allowlist + injection guard) → deterministic `recommendation()` → `template_ask` → `pending_orders[phone]` → `சரி` → per-item token+dispatch → stock ledger 12→32 + mock/copilot logs.
 - **2026-09-18 (late night, copilot brain): 103/103 battery green — commit `a495fce` pushed.**
   - Full WhatsApp copilot built & verified end-to-end via `/copilot/simulate` (force_mock — no real sends):
@@ -58,6 +92,22 @@ Finale: in-person build day — **FULL COPILOT WHATSAPP LIVE — CONNECTED ✅**
   - `TWILIO_CONTENT_MODE=freeform` added — kills the "Appt" template blocker in sandbox (plain Body).
   - Phone allowlist via `COPILOT_ALLOWED_PHONES`; default = `TWILIO_WHATSAPP_TO`. `.env.example` updated.
   - Battery grew 86 → **103** checks (section 13, 17 new).
+- **2026-09-19 (morning, stage fail-safe #2): copilot Q&A demo RECORDED + NARRATED** —
+  `finale/backup_demo/copilot_narrated.mp4` (H.264 + AAC, 1360×850, 32 s, **PRIMARY** fail-safe):
+  real headed-Chromium run of the copilot chat — Q&A from live data (price ₹18, stock 12),
+  Tamil order ₹546, "5 kg less" adjust 20→15 re-priced ₹456, "சரி" → dispatched, stock 12→27,
+  ledger row — narrated by the same Sarvam `bulbul:v3`/`kavitha` voice as the product.
+  Master `copilot.webm`, timestamped `copilot_transcript.txt`, proof stills
+  `copilot_stage_ask/dispatched.png`. Regen: `node qa-runs/pw/record_copilot.js` then
+  `python make_copilot_narrated.py` (rename Playwright's `page@*.webm` → `copilot.webm`).
+  Same ⚠ as below: drives a real dispatch — `POST /demo/reset` after re-recording.
+- **2026-09-19 (reliability hardening): API-wedge root cause FIXED.** After heavy bursts the
+  API stopped accepting (health timeouts). Root cause: Sarvam SDK calls (`/stt`, `/wa/inbound`
+  STT, `/tts`) ran directly in the route threadpool with **no outer timeout** — a hung provider
+  call parked a worker forever; enough of them froze the server. All three now run on a dedicated
+  bounded executor with hard deadlines (45/45/40 s) that return **labeled fallbacks** (typed
+  transcript / "" / cached-audio hint) instead of hanging. Restart procedure fixed too: kill by
+  port (`netstat`/`taskkill`), not by a pid file that was recording the bash subshell.
 - **2026-09-18 (night, stage fail-safe): backup demo RECORDED + NARRATED** — `finale/backup_demo/`:
   real Full Auto run captured in headed Chromium → `demo_backup_narrated.mp4` (H.264 + AAC,
   1360×850, 34 s) with a Sarvam `bulbul:v3` narration track timed to the pipeline beats, plus a

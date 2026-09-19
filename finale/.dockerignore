@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.venv
+venv
+.env
+data/*.log
+data/*.json
+!data/runtime_state.json
+.git
+.gitignore
+node_modules
