@@ -790,12 +790,11 @@ def _onboarding_complete_msg(profile: dict, lang: str) -> str:
 
 
 def _tap_suffix(options: list[dict], channel: str) -> str:
-    """For WhatsApp (no buttons) append numbered tappable list — no typing needed."""
+    """For WhatsApp (no buttons) append multi-line tappable list — no typing."""
     if channel != "wa-akg" or not options:
         return ""
-    # numbered for "reply 1" support
-    picks = " | ".join(f"{i+1}. {o['label']}" for i, o in enumerate(options[:4]))
-    return f"\n\n👉 Tap: {picks}  (reply 1/2/3 or hold 🎤 mic)"
+    lines = "\n".join(f"{i+1}. {o['label']}" for i, o in enumerate(options[:4]))
+    return f"\n\n👉 Tap an option:\n{lines}\n(reply 1/2/3/4 or hold 🎤 mic)"
 
 
 def _choice_options(status: str, lang: str, step: int | None = None) -> list[dict]:
@@ -1964,11 +1963,13 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
 
 
 @app.post("/wa/inbound")
-def wa_inbound(payload: dict):
+def wa_inbound(payload: dict, sync: bool = False):
     """WA-AKG webhook: ACK immediately (low-latency), process async.
     Fixes: 'operation aborted due to timeout' retry storm — the webhook must
     return 200 in <500ms, not after the WA-AKG send + TTS. Also: groups
-    (@g.us) and unknown callers are ignored, never replied to."""
+    (@g.us) and unknown callers are ignored, never replied to.
+    ?sync=1 (demo/test only): process inline and return the copilot result so
+    UIs and QA can render the actual reply without polling."""
     data = payload.get("data") or {}
     raw_phone = (data.get("from") or (data.get("key") or {}).get("remoteJid") or "")
     # Groups: ignore entirely (no reply, no ledger) — prevents @g.us wrong-number sends
@@ -1990,6 +1991,17 @@ def wa_inbound(payload: dict):
             media = base.rstrip("/") + media
     headers = {"X-API-Key": os.getenv("WA_AKG_API_KEY", "")} if media and os.getenv("WA_AKG_API_KEY") else None
     ctype = data.get("mimetype") or data.get("contentType") or ""
+
+    if sync:
+        try:
+            result = _handle_merchant_message(
+                raw_phone, text=text, media_url=media, media_headers=headers,
+                content_type=ctype, channel="wa-akg")
+            return {"received": True, "queued": False, "phone": phone_digits,
+                    "result": result}
+        except Exception:
+            return {"received": True, "queued": False, "phone": phone_digits,
+                    "result": {"status": "error"}}
 
     def _process():
         try:
