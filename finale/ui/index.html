@@ -73,6 +73,14 @@ input.txt:focus{outline:0;border-color:var(--blue)}
 .wa-dot.queued,.wa-dot.accepted{background:var(--amber)}
 .wa-dot.failed{background:var(--red)}
 .autodemo{background:linear-gradient(90deg,#ECFDF5,#F0FDF4);border:1.5px solid #A7F3D0;border-radius:12px;padding:10px 12px;margin:10px 0}
+.copilot-chat{height:280px;overflow:auto;background:#F8FAFC;border:1.5px solid var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:78%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.bubble.user{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:4px}
+.bubble.bot{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px}
+.bubble.bot.awaiting{border-color:var(--amber);background:#FFFBEB}
+.bubble.bot.dispatched{border-color:var(--green);background:#ECFDF5}
+.bubble .meta{font-size:11px;color:var(--mut);margin-top:4px}
+.bubble.bot .meta{color:#475569}
 footer{max-width:1180px;margin:6px auto 24px;padding:0 18px;font-size:11.5px;color:var(--mut);line-height:1.6}
 </style>
 </head>
@@ -152,6 +160,31 @@ footer{max-width:1180px;margin:6px auto 24px;padding:0 18px;font-size:11.5px;col
     </div>
     <audio id="player" controls style="width:100%;display:none;margin-top:8px"></audio>
     <audio id="cmdPlayer" style="display:none"></audio>
+  </div>
+
+  <!-- 2b · COPILOT CHAT (mirrors WhatsApp, same /copilot/simulate brain) -->
+  <div class="card">
+    <h2><span class="h2n">2b</span> Copilot — WhatsApp + Web <span class="chip det" style="margin-left:auto">same brain as WhatsApp</span></h2>
+    <div class="copilot-chat" id="copilotChatBox"></div>
+    <div class="row" style="margin-top:10px">
+      <input class="txt" id="copilotInput" placeholder='நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி — or "20kg tomato"' onkeydown="if(event.key==='Enter')copilotSend()">
+      <button class="btn" onclick="copilotSend()">Send</button>
+      <button class="btn btn-ghost" id="copilotMic" onclick="copilotMic()" title="Voice → Sarvam STT → copilot">🎙</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('ta')">TA: 20 கிலோ</button>
+      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('kn')">KN: 20 ಕಿಲೋ</button>
+      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('hi')">HI: 20 किलो</button>
+      <button class="btn btn-ghost btn-sm" onclick="copilotQuick('en')">EN: 20 kg</button>
+      <button class="btn btn-ghost btn-sm" onclick="copilotApprove()">சரி approve</button>
+      <button class="btn btn-ghost btn-sm" onclick="copilotReset()">Clear</button>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <span class="chip" id="copilotPhone">merchant: 917010919624 (allowlisted)</span>
+      <span class="chip llm" id="copilotEngine">engine: deterministic</span>
+      <span class="chip" id="copilotTransport">WA-AKG → Twilio → mock</span>
+    </div>
+    <small>Same <code>/copilot/simulate</code> + <code>/wa/inbound</code> brain as WhatsApp. Voice uses Sarvam saaras:v3 (OGG native). Quantities always from engine.</small>
   </div>
 
   <!-- 3 · WHY THIS ORDER -->
@@ -594,6 +627,90 @@ async function doRecall(){
     log('Cognee recall ok in ' + j.elapsed_s + 's');
   }catch(e){ log('Recall failed: ' + e.message); box.innerHTML = '<img src="../cognee/graph_fallback.svg" style="width:100%">'; }
 }
+
+// ── Copilot Chat (mirrors WhatsApp brain — same /copilot/simulate) ──
+const COPILOT_PHONE = '917010919624';
+function copilotAddBubble(role, text, meta){
+  const box = document.getElementById('copilotChatBox');
+  const b = document.createElement('div'); b.className = 'bubble ' + role;
+  if (meta && role === 'bot'){
+    if (meta.status === 'awaiting_approval') b.classList.add('awaiting');
+    if (meta.status === 'dispatched') b.classList.add('dispatched');
+  }
+  b.innerHTML = esc(text) + (meta ? '<div class="meta">' + esc(meta) + '</div>' : '');
+  box.appendChild(b); box.scrollTop = box.scrollHeight;
+}
+async function copilotSend(){
+  const inp = document.getElementById('copilotInput');
+  const text = (inp.value || '').trim();
+  if (!text){ return; }
+  inp.value = '';
+  copilotAddBubble('user', text, 'you · ' + sttLang());
+  log('Copilot send: ' + text);
+  try{
+    const r = await fetch(API + '/copilot/simulate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: COPILOT_PHONE, text }) });
+    const j = await r.json();
+    let botText = '';
+    let meta = j.engine + ' · ' + j.status;
+    if (j.status === 'awaiting_approval'){
+      botText = j.ask || JSON.stringify(j.items);
+      meta += ' · ₹' + j.basket_total_inr;
+      // Enrich with Sarvam explanation (best response)
+      try{
+        const er = await fetch(API + '/explain', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ products: j.items ? Object.fromEntries(j.items.map(i=>[i.product, null])) : j.products }) });
+        const ej = await er.json();
+        if (ej.text) botText += '\n\n— ' + ej.text;
+      }catch(e){}
+      document.getElementById('copilotEngine').textContent = 'engine: ' + j.engine + ' · ' + j.status;
+    } else if (j.status === 'dispatched'){
+      botText = j.confirm || 'dispatched';
+      meta += ' · ' + (j.dispatched||[]).length + ' items';
+      document.getElementById('copilotEngine').textContent = 'engine: dispatched ✅';
+      refreshState(); refreshWhatsapp();
+    } else if (j.status === 'unknown_caller'){
+      botText = 'HarvestWise: unknown caller — not allowlisted.';
+    } else if (j.status === 'injection_blocked'){
+      botText = 'HarvestWise: speech refused — embedded instructions were ignored.';
+    } else if (j.status === 'no_intent'){
+      botText = 'HarvestWise: I did not catch a product. Try: நாளை 20 கிலோ தக்காளி.';
+    } else {
+      botText = JSON.stringify(j, null, 2);
+    }
+    copilotAddBubble('bot', botText, meta);
+    log('Copilot [' + j.status + ']: ' + botText.slice(0,120));
+    if (j.status === 'awaiting_approval') copilotAddBubble('bot', 'Tip: reply "சரி" to approve → stock 12→32', 'hint');
+  }catch(e){ copilotAddBubble('bot', 'Copilot error: ' + e.message, 'error'); }
+}
+function copilotQuick(lang){ const t = QUICK_TEXT[lang] || QUICK_TEXT.ta; document.getElementById('copilotInput').value = t; copilotSend(); }
+function copilotApprove(){ document.getElementById('copilotInput').value = 'சரி'; copilotSend(); }
+function copilotReset(){ document.getElementById('copilotChatBox').innerHTML = ''; fetch(API + '/demo/reset', { method:'POST' }).then(()=>{ refreshState(); log('Copilot reset — demo state cleared'); }); }
+let copilotRecorder = null, copilotChunks = [];
+async function copilotMic(){
+  const btn = document.getElementById('copilotMic');
+  if (copilotRecorder && copilotRecorder.state === 'recording'){ copilotRecorder.stop(); return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    copilotRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    copilotChunks = [];
+    copilotRecorder.ondataavailable = e => copilotChunks.push(e.data);
+    copilotRecorder.onstop = async () => {
+      stream.getTracks().forEach(t=>t.stop());
+      btn.textContent = '🎙'; btn.classList.remove('recording');
+      const blob = new Blob(copilotChunks, { type: 'audio/webm' });
+      log('Copilot mic: ' + (blob.size/1024).toFixed(0) + ' KB');
+      const fd = new FormData(); fd.append('file', blob, 'audio.webm');
+      try{
+        const r = await fetch(API + '/stt?language_code=' + encodeURIComponent(sttLang()), { method:'POST', body: fd });
+        const j = await r.json();
+        document.getElementById('copilotInput').value = j.transcript;
+        copilotSend();
+      }catch(e){ copilotAddBubble('bot','STT failed — type your message', 'error'); }
+    };
+    copilotRecorder.start(); btn.textContent = '⏹'; btn.classList.add('recording'); log('Copilot recording… (' + sttLang() + ')');
+  }catch(e){ log('Mic error: ' + e.message); }
+}
+// Seed copilot chat with hint
+setTimeout(()=> copilotAddBubble('bot', 'Vanakkam Lakshmi! Try: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி" — I will reply exactly like WhatsApp, with engine quantities + Sarvam explanation.', 'HarvestWise copilot · deterministic engine · 78% rain → ₹546'), 600);
 
 check(); refreshState(); refreshWhatsapp(); loadSoundbox();
 setInterval(refreshWhatsapp, 30000);
