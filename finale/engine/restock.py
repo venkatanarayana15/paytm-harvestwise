@@ -256,6 +256,58 @@ def stock_snapshot(merchant_id: str) -> dict:
     return state["stock"].get(merchant_id, {})
 
 
+def set_stock(merchant_id: str, product: str, qty: int) -> dict:
+    """CRUD: set stock directly (for copilot 'update stock tomato 5kg')."""
+    state = _load_state()
+    before = state["stock"].setdefault(merchant_id, {}).get(product, 0)
+    state["stock"][merchant_id][product] = max(0, int(qty))
+    _save_state()
+    return {"product": product, "before": before, "after": state["stock"][merchant_id][product]}
+
+
+def add_stock(merchant_id: str, product: str, delta: int) -> dict:
+    """CRUD: add delta to stock (for 'add stock 5kg tomato')."""
+    state = _load_state()
+    before = state["stock"].setdefault(merchant_id, {}).get(product, 0)
+    after = max(0, before + int(delta))
+    state["stock"][merchant_id][product] = after
+    _save_state()
+    return {"product": product, "before": before, "after": after, "delta": delta}
+
+
+def delete_stock(merchant_id: str, product: str) -> dict:
+    """CRUD: delete product from inventory."""
+    state = _load_state()
+    snap = state["stock"].setdefault(merchant_id, {})
+    existed = product in snap
+    if existed:
+        del snap[product]
+        _save_state()
+    return {"product": product, "deleted": existed}
+
+
+def add_product(merchant_id: str, product: str, price: int = 20, unit: str = "kg", velocity: int = 10, stock: int = 0) -> dict:
+    """CRUD: add new product to CATALOG (runtime) + stock."""
+    prod = product.lower().strip()
+    if prod not in CATALOG.get(merchant_id, {}):
+        CATALOG[merchant_id][prod] = {
+            "name_tn": prod, "name_kn": prod, "name_hi": prod, "name_te": prod,
+            "unit": unit, "velocity": velocity, "decay_days": 2, "current_stock": stock,
+            "rain_modifier": 1.0, "supplier": "Basavanagudi Mandi", "price_per_unit": price,
+        }
+        MAX_ORDER[prod] = 100
+        # also register for word matching
+        try:
+            from api.main import PRODUCT_WORDS
+            PRODUCT_WORDS[prod] = prod
+        except Exception:
+            pass
+    state = _load_state()
+    state["stock"].setdefault(merchant_id, {})[prod] = stock
+    _save_state()
+    return {"product": prod, "price": price, "unit": unit, "stock": stock}
+
+
 def record_delivery(merchant_id: str, product: str, qty: int, supplier: str,
                     total_inr: int | None, token: str) -> dict:
     """A dispatched order arrives from the mandi -> inventory rises, ledger

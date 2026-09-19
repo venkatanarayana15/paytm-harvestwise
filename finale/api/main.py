@@ -1886,20 +1886,31 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
 
     # helper: extract product name (catalog or word after add/need to add)
     def _extract_prod(txt):
-        if _catalog_product_in(txt):
-            return _catalog_product_in(txt)
+        lowx = txt.lower()
+        if _catalog_product_in(lowx):
+            return _catalog_product_in(lowx)
+        # check CATALOG keys directly (for newly added veg)
+        for k in CATALOG.get(MERCHANT, {}).keys():
+            if re.search(r"\b" + re.escape(k) + r"\b", lowx):
+                return k
         # add X / need to add X / add X on/in inventory
-        m = re.search(r"add(?:\s+(?:product|inventory))?\s+([a-z]+)\s+(?:on|in|to)?\s*inventory", txt)
+        m = re.search(r"add(?:\s+(?:product|inventory))?\s+([a-z]+)\s+(?:on|in|to)?\s*inventory", lowx)
         if m:
             return m.group(1).lower()
-        m = re.search(r"add(?:\s+(?:product|inventory))?\s+([a-z]+)", txt)
+        m = re.search(r"add(?:\s+(?:product|inventory))?\s+([a-z]+)", lowx)
         if m:
-            return m.group(1).lower()
-        m = re.search(r"add\s+([a-z]{3,})\s+\d+", txt)
+            cand = m.group(1).lower()
+            if cand not in ["product","inventory","stock","new","vegetable","veg"]:
+                return cand
+        m = re.search(r"add\s+([a-z]{3,})\s+\d+", lowx)
         if m:
             return m.group(1).lower()
         # new vegetable ... X
-        m = re.search(r"new\s+(?:vegetable|veg)\s+([a-z]+)", txt)
+        m = re.search(r"new\s+(?:vegetable|veg)\s+([a-z]+)", lowx)
+        if m:
+            return m.group(1).lower()
+        # fallback: last word that looks like veg (for "brinjal price")
+        m = re.search(r"\b([a-z]{3,})\s+(?:price|rate|stock)\b", lowx)
         if m:
             return m.group(1).lower()
         return None
@@ -1927,10 +1938,82 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         leader_p = leader.get("product", "tomato") if isinstance(leader, dict) else "tomato"
         leader_m = int(leader.get("daily_margin", 0)) if isinstance(leader, dict) else 0
 
-        # ── GROWTH / SALES / BRIEFING ──
+        # ── INVENTORY / CRUD ACTIONS (Must come before price/stock queries) ──
+        prod = _extract_prod(transcript)
+        qty = _extract_qty(transcript)
+        price = _extract_price(transcript)
+        unit = "bunch" if "bunch" in low else "kg"
+
+        if "add" in low or "create" in low:
+            if prod and prod not in CATALOG.get(MERCHANT, {}):
+                # new product
+                add_product(MERCHANT, prod, price=price, unit=unit, stock=qty)
+                resp = {
+                    "ta": f"{prod} added — {qty} {unit} @ Rs.{price} — new vegetable! Stock: {qty} {unit}",
+                    "en": f"{prod} added — {qty} {unit} @ Rs.{price} — new vegetable! Stock: {qty} {unit}",
+                }
+                return resp.get(lang, resp["en"])
+            elif prod:
+                # existing product: add stock
+                add_stock(MERCHANT, prod, qty)
+                resp = {
+                    "ta": f"{prod} stock updated.",
+                    "en": f"{prod} stock updated.",
+                }
+                return resp.get(lang, resp["en"])
+
+        if "update" in low or "set" in low:
+            if prod:
+                set_stock(MERCHANT, prod, qty)
+                resp = {
+                    "ta": f"{prod} stock updated.",
+                    "en": f"{prod} stock updated.",
+                }
+                return resp.get(lang, resp["en"])
+
+        if ("delete" in low or "remove" in low) and ("stock" in low or "inventory" in low):
+            if prod:
+                delete_stock(MERCHANT, prod)
+                resp = {
+                    "ta": f"{prod} deleted.",
+                    "en": f"{prod} removed from inventory.",
+                }
+                return resp.get(lang, resp["en"])
+
+        # ── SPECIFIC ITEM QUERIES (PRICE/STOCK) ──
+        if prod and ("price" in low or "rate" in low):
+            d = CATALOG[MERCHANT].get(prod, {})
+            price = d.get("price_per_unit", 0)
+            resp = {
+                "ta": f"{prod} price: Rs.{price}/ {d.get('unit', 'kg')}",
+                "en": f"{prod} price: Rs.{price}/ {d.get('unit', 'kg')}",
+            }
+            return resp.get(lang, resp["en"])
+
+        if prod and ("how many" in low or "how much" in low) and not any(w in low for w in ["to buy", "tomorrow", "list"]):
+            qty = snap.get(prod, 0)
+            unit = CATALOG[MERCHANT].get(prod, {}).get("unit", "kg")
+            exp = " ⏳ 1-day expiry" if CATALOG[MERCHANT].get(prod, {}).get("decay_days", 0) <= 1 else ""
+            low_alert = " ⚠️ low!" if qty <= 3 else ""
+            resp = {
+                "ta": f"எண்ணி {prod}: {qty} {unit}{exp}{low_alert}",
+                "en": f"{prod}: {qty} {unit}{exp}{low_alert}",
+            }
+            return resp.get(lang, resp["en"])
+
+        # ── SPECIFIC WEATHER ──
+        if any(w in low for w in ["weather", "rain"]) and not any(w in low for w in ["tomorrow", "buy", "list", "briefing"]):
+            resp = {
+                "ta": f"வருத்த: {rain}% மழை.",
+                "en": f"Rain: {rain}%",
+            }
+            return resp.get(lang, resp["en"])
+
+        # ── GROWTH ──
         if any(w in low for w in ["grow", "growth", "grow sales", "sales grow", "business grow"]):
             return _growth_answer(lang)
 
+        # ── SALES REPORT ──
         if any(w in low for w in ["show sales", "sales", "how many sold", "sales report", "this month sales"]):
             hist = order_history(MERCHANT, 50)
             total = sum(row.get("total_inr", 0) for row in hist[:30])
@@ -1978,45 +2061,25 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
             }
             return resp.get(lang, resp["en"])
 
-        # ── INVENTORY / CRUD ACTIONS ──
-        prod = _extract_prod(transcript)
-        qty = _extract_qty(transcript)
-        price = _extract_price(transcript)
-        unit = "bunch" if "bunch" in low else "kg"
-
-        if "add" in low or "create" in low:
-            if prod and prod not in CATALOG.get(MERCHANT, {}):
-                # new product
-                add_product(MERCHANT, prod, price=price, unit=unit, stock=qty)
-                resp = {
-                    "ta": f"{prod} added — {qty} {unit} @ Rs.{price} — new vegetable! Stock: {qty} {unit}",
-                    "en": f"{prod} added — {qty} {unit} @ Rs.{price} — new vegetable! Stock: {qty} {unit}",
-                }
-                return resp.get(lang, resp["en"])
-            elif prod:
-                # existing product: add stock
-                res = add_stock(MERCHANT, prod, qty)
-                resp = {
-                    "ta": f"{prod} +{qty} → {res['after']} {unit}",
-                    "en": f"{prod} +{qty} → {res['after']} {unit} — stock updated.",
-                }
-                return resp.get(lang, resp["en"])
-
         if "update" in low or "set" in low:
-            if prod:
-                res = set_stock(MERCHANT, prod, qty)
+            prod2 = _extract_prod(transcript)
+            if prod2:
+                qty2 = _extract_qty(transcript)
+                unit2 = "bunch" if "bunch" in low else "kg"
+                res = set_stock(MERCHANT, prod2, qty2)
                 resp = {
-                    "ta": f"{prod} stock {res['before']}→{res['after']} {unit}",
-                    "en": f"{prod} stock {res['before']}→{res['after']} {unit} — updated.",
+                    "ta": f"{prod2} stock {res['before']}→{res['after']} {unit2}",
+                    "en": f"{prod2} stock {res['before']}→{res['after']} {unit2} — updated.",
                 }
                 return resp.get(lang, resp["en"])
 
-        if "delete" in low or "remove" in low and "stock" in low:
-            if prod:
-                delete_stock(MERCHANT, prod)
+        if ("delete" in low or "remove" in low) and ("stock" in low or "inventory" in low):
+            prod2 = _extract_prod(transcript)
+            if prod2:
+                delete_stock(MERCHANT, prod2)
                 resp = {
-                    "ta": f"{prod} deleted.",
-                    "en": f"{prod} removed from inventory.",
+                    "ta": f"{prod2} deleted.",
+                    "en": f"{prod2} removed from inventory.",
                 }
                 return resp.get(lang, resp["en"])
 
