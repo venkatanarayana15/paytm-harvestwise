@@ -1548,6 +1548,26 @@ def _qa_answer(kind: str, low: str, lang: str) -> str:
             "en": f"{name}: Rs.{data['price_per_unit']}/{unit} (mandi rate, seeded demo data).",
         }[lang]
     if kind == "stock":
+        # Full inventory when no product mentioned (Check stock / stock?)
+        if not _catalog_product_in(low) or low.strip() in ("stock","check stock","inventory","stock?"):
+            snap = stock_snapshot(MERCHANT)
+            lines=[]
+            for p,s in snap.items():
+                d=CATALOG[MERCHANT][p]
+                n=_loc_name(d,p,lang)
+                # low-stock / expiry alerts
+                alert=""
+                if s <= 4: alert=" ⚠️ low!"
+                elif d["decay_days"]==1 and s<=6: alert=" ⏳ 1-day expiry"
+                lines.append(f"{n}: {s} {d['unit']}{alert}")
+            body="\n".join(lines)
+            return {
+                "ta": f"மொத்த ஸ்டாக்:\n{body}",
+                "kn": f"ಒಟ್ಟು ದಾಸ್ತಾನು:\n{body}",
+                "hi": f"कुल स्टॉक:\n{body}",
+                "te": f"మొత్తం స్టాక్:\n{body}",
+                "en": f"Full stock:\n{body}",
+            }[lang]
         stock = get_stock(MERCHANT, product)
         return {
             "ta": f"{name}: இப்போது {stock} {unit} கையில் உள்ளது.",
@@ -1603,32 +1623,35 @@ def _qa_answer(kind: str, low: str, lang: str) -> str:
 
 
 def _growth_answer(lang: str) -> str:
-    """AI Partner growth predictions: forecast + bundle + margin — pure language, no mix."""
+    """Partner growth: forecast + GMV + stock + bundle + margin — live, not static."""
     fc = get_sales_forecast(MERCHANT)
     bundle = get_bundle_suggestion("tomato")
     leader = get_margin_leader(MERCHANT)
-    # pure language templates
+    snap = stock_snapshot(MERCHANT)
+    orders = order_history(MERCHANT, 20)
+    gmv7 = sum(o.get("total_inr",0) for o in orders[:7])
+    low = [p for p,s in snap.items() if s<=4]
+    low_txt = f" Low: {', '.join(low)}" if low else ""
     if lang == "ta":
         lines = [
-            f"📈 Forecast: {fc['reason']} → lift {fc['lift']:.1f}x",
+            f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x | 7d GMV ₹{gmv7}{low_txt}",
             f"💡 Bundle: {bundle['why']} — {bundle['with']} {bundle['qty']} bunch add pannalaama?",
-            f"💰 Margin leader: {leader['name_tn']} (₹{leader['price']} × {leader['velocity']}/d)",
+            f"💰 Best margin: {leader['name_tn']} (₹{leader['price']} × {leader['velocity']}/d) | Stock: tomato {snap.get('tomato')}kg",
             "Tap 1: Check stock  2: tomato 20kg  3: Order bundle",
         ]
         return "\n".join(lines)
     if lang == "hi":
         lines = [
-            f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x",
+            f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x | 7d GMV ₹{gmv7}{low_txt}",
             f"💡 Bundle: {bundle['why']} — {bundle['with']} {bundle['qty']} जोड़ें?",
             f"💰 Best margin: {leader['product']} (₹{leader['price']} × {leader['velocity']}/d)",
             "Tap: 1 Check stock  2 tomato 20kg",
         ]
         return "\n".join(lines)
-    # en/te/kn fallback
     return (
-        f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x\n"
+        f"📈 Forecast: {fc['reason']} → {fc['lift']:.1f}x | 7d GMV ₹{gmv7}{low_txt}\n"
         f"💡 Bundle: {bundle['why']} — add {bundle['with']} {bundle['qty']}?\n"
-        f"💰 Margin leader: {leader['product']} (₹{leader['price']} × {leader['velocity']}/d)\n"
+        f"💰 Margin leader: {leader['product']} (₹{leader['price']} × {leader['velocity']}/d) | Tomato {snap.get('tomato')}kg on hand\n"
         "Tap: 1 Check stock  2 tomato 20kg"
     )
 
@@ -1883,6 +1906,54 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         return {"status": "helped", "reply": reply, "options": opts, "send": send,
                 "phone": phone_digits, "transcript": transcript, "channel": channel}
 
+    # ── Cart commands — order matters: clear/remove before show
+    if any(p in low for p in ["clear cart","empty cart","clear basket","cart clear"]):
+        pending_orders.pop(phone_digits,None)
+        reply={"ta":"Cart cleared.","hi":"Cart clear kiya.","en":"Cart cleared."}.get(lang,"Cart cleared.")
+        opts=_choice_options("greeted",lang)
+        send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status":"cart_cleared","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if low.strip() in ("show cart","view cart","my cart","cart","basket","show basket") or any(p==low.strip() for p in ["cart","basket"]):
+        pend = _get_pending(phone_digits)
+        if not pend or not pend.get("items"):
+            reply = {"ta":"Cart empty — add tomato 10kg?","hi":"Cart khaali — tomato 10kg add karein?","en":"Cart empty — try tomato 20kg"}.get(lang,"Cart empty — try tomato 20kg")
+            opts = _choice_options("greeted", lang)
+            send = _copilot_send(phone_digits, reply + _tap_suffix(opts, channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status":"cart_empty","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+        lines=[f"• {i['recommended_qty']} {i['unit']} {_loc_name(CATALOG[MERCHANT][i['product']],i['product'],lang)} — Rs.{i['total_inr']}" for i in pend["items"]]
+        total=pend["total_inr"]
+        reply={"ta":f"Cart ({len(lines)} items):\n"+"\n".join(lines)+f"\nTotal Rs.{total}","hi":f"Cart ({len(lines)}):\n"+"\n".join(lines)+f"\nTotal Rs.{total}","en":f"Cart ({len(lines)} items):\n"+"\n".join(lines)+f"\nTotal Rs.{total}"}.get(lang,f"Cart:\n"+"\n".join(lines))
+        opts=_choice_options("awaiting_approval",lang)
+        send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+        return {"status":"cart_view","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    # also handle bare "cart" inside longer phrase only if no product
+    if "cart" in low and not _catalog_product_in(low):
+        pend = _get_pending(phone_digits)
+        if pend and pend.get("items"):
+            lines=[f"• {i['recommended_qty']} {i['unit']} {_loc_name(CATALOG[MERCHANT][i['product']],i['product'],lang)} — Rs.{i['total_inr']}" for i in pend["items"]]
+            total=pend["total_inr"]
+            reply=f"Cart ({len(lines)} items):\n"+"\n".join(lines)+f"\nTotal Rs.{total}"
+            opts=_choice_options("awaiting_approval",lang)
+            send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+            return {"status":"cart_view","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    if low.startswith("remove ") or "remove" in low:
+        prod=_catalog_product_in(low)
+        pend=_get_pending(phone_digits)
+        if prod and pend and pend.get("items"):
+            new_items=[i for i in pend["items"] if i["product"]!=prod]
+            if len(new_items)!=len(pend["items"]):
+                pend["items"]=new_items
+                pend["total_inr"]=sum(x["total_inr"] for x in new_items)
+                pend["products"]={i["product"]:i["recommended_qty"] for i in new_items}
+                if not new_items:
+                    pending_orders.pop(phone_digits,None)
+                    reply={"ta":f"{prod} removed — cart empty.","en":f"{prod} removed — cart empty."}.get(lang,f"{prod} removed.")
+                else:
+                    reply={"ta":f"{prod} removed.","en":f"{prod} removed — {len(new_items)} left."}.get(lang,f"{prod} removed.")
+                opts=_choice_options("awaiting_approval" if new_items else "greeted",lang)
+                send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+                return {"status":"cart_updated","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+
     rules = _rules_intent(transcript)
     if rules["intent"] == "decline":
         pending_orders.pop(phone_digits, None)
@@ -1995,11 +2066,23 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
                     "phone": phone_digits, "transcript": transcript,
                     "engine": "rules", "channel": channel}
 
-    items, total = [], 0
+    # Build new items from this turn
+    new_items, new_total = [], 0
     for product, requested in rules["products"].items():
         rec = recommendation(MERCHANT, product, requested)
-        items.append(rec)
-        total += rec["total_inr"]
+        new_items.append(rec)
+        new_total += rec["total_inr"]
+    # ── True cart: merge, don't overwrite
+    existing = _get_pending(phone_digits)
+    if existing and existing.get("items"):
+        merged = {i["product"]: i for i in existing["items"]}
+        for rec in new_items:
+            merged[rec["product"]] = rec
+        items = list(merged.values())
+        total = sum(x["total_inr"] for x in items)
+        merged_products = {**existing.get("products", {}), **rules["products"]}
+    else:
+        items, total, merged_products = new_items, new_total, rules["products"]
     weather = get_weather()
     # Sarvam P3 may REWRITE the ask; the grounding gate in llm.py rejects any
     # output that drops or alters an engine quantity -> deterministic template.
@@ -2024,7 +2107,7 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
             message = f"{ask}{CONFIRM_SUFFIX[lang]}"
     except Exception:
         message = f"{ask}{CONFIRM_SUFFIX[lang]}"
-    pending_orders[phone_digits] = {"products": rules["products"], "items": items,
+    pending_orders[phone_digits] = {"products": merged_products, "items": items,
                                     "total_inr": total,
                                     "created": datetime.datetime.now().timestamp()}
     optsF = _choice_options("awaiting_approval", lang)
