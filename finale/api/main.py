@@ -1891,11 +1891,56 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         return {"status": "declined", "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
     if rules["intent"] != "create_restock_order" or not rules.get("products"):
-        reply = _fallback_text(lang)
+        # ── Enhanced fallback: try Sarvam LLM with cognee grounding, else helpful capability list
+        try:
+            cognee_snippet = ""
+            try:
+                with open(MEMORY_PATH, encoding="utf-8") as f:
+                    mem = json.load(f).get(MERCHANT, {})
+                    facts = mem.get("huge_facts", [])[:2]
+                    if facts:
+                        cognee_snippet = " | ".join(facts)
+            except OSError:
+                pass
+            # Try LLM for any-question handling (hybrid mode, 5s budget)
+            llm_reply = None
+            if llm_mod.available() and transcript.strip():
+                ctx_hint = ctx or cognee_snippet
+                prompt = (
+                    f"You are HarvestWise, a vernacular restocking copilot for Lakshmi (Basavanagudi, sells tomato/onion/coriander/spinach). "
+                    f"User asked in {lang}: '{transcript}'. "
+                    f"Context: {ctx_hint[:400] if ctx_hint else 'no memory yet'}. "
+                    f"Answer helpfully in {lang} (pure language, no mix). Keep ≤2 sentences. "
+                    f"If you don't know, list what you CAN do: stock, price, why 20kg, weather, orders, growth. Never invent quantities."
+                )
+                raw = llm_mod._call(
+                    [{"role": "system", "content": "You are HarvestWise copilot. Answer concisely in the user's language."},
+                     {"role": "user", "content": prompt}],
+                    model=llm_mod.FAST_MODEL, max_tokens=300, temperature=0.3, timeout=5
+                )
+                if raw and len(raw.strip()) > 10:
+                    llm_reply = raw.strip()[:600]
+            if llm_reply:
+                reply = llm_reply
+            else:
+                # Deterministic helpful fallback with capabilities + memory
+                base = _fallback_text(lang)
+                caps = {
+                    "ta": " நான் செய்யக்கூடியவை: பங்கு, விலை, ஏன் 20கிலோ, வானிலை, ஆர்டர்கள், வளர்ச்சி.",
+                    "hi": " मैं ये कर सकता हूँ: स्टॉक, कीमत, क्यों 20kg, मौसम, ऑर्डर, ग्रोथ।",
+                    "en": " I can help with: stock, price, why 20kg, weather, orders, growth."
+                }.get(lang, " I can help with: stock, price, why 20kg, weather, orders, growth.")
+                reply = base + caps
+                if ctx:
+                    reply += f"\n\n(Note: {ctx[:180]})"
+                elif cognee_snippet:
+                    reply += f"\n\n(Graph: {cognee_snippet[:180]})"
+        except Exception:
+            reply = _fallback_text(lang)
         opts = _choice_options("greeted", lang)
         _copilot_send(phone_digits, reply + _tap_suffix(opts, channel), force_mock=force_mock, voice_mode=vmode)
         return {"status": "no_intent", "reply": reply, "options": opts, "phone": phone_digits,
-                "transcript": transcript, "channel": channel}
+                "transcript": transcript, "channel": channel, "cognee_used": bool(ctx)}
 
     # Optional 'more/less' adjustment to the CURRENT pending basket:
     # 'இன்னும் 5 கிலோ' / '5 kg less' / 'इसे 5 कम करो' — needs a pending order.
