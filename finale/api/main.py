@@ -1879,16 +1879,55 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
 
     qkind = _question_kind(low)
     if qkind:
-        answer = _qa_answer(qkind, low, lang)
-        if ctx:
-            answer = f"{answer}\n\n(குறிப்பு: {ctx[:200]})" if lang == "ta" \
-                else f"{answer}\n\n(Note from memory: {ctx[:200]})"
+        # ── Brain-first: try Sarvam + Cognee, else deterministic template
+        template = _qa_answer(qkind, low, lang)
+        brain_answer = None
+        if llm_mod.available():
+            try:
+                # Build shop grounding for brain
+                snap = stock_snapshot(MERCHANT)
+                prod = _catalog_product_in(low) or "tomato"
+                d = CATALOG[MERCHANT].get(prod, {})
+                mem_snip = ""
+                try:
+                    with open(MEMORY_PATH, encoding="utf-8") as f:
+                        mem = json.load(f).get(MERCHANT, {})
+                        facts = mem.get("huge_facts", []) or mem.get("cause_chain", [])
+                        qwords = set(re.findall(r"\w+", low))
+                        filt = [x for x in facts if any(w in x.lower() for w in qwords)] if qwords else facts
+                        if filt: mem_snip = " | ".join(filt[:2])
+                except OSError:
+                    pass
+                ctx_hint = ctx or mem_snip
+                prompt = (
+                    f"You are Lakshmi's partner at Basavanagudi. Q: '{transcript}' (kind={qkind}, lang={lang}). "
+                    f"Shop: {prod} {d.get('velocity','')} {d.get('unit','')}/day, stock {snap.get(prod,'?')}{d.get('unit','')}, "
+                    f"rain {int(round(get_weather()['rain_prob']*100))}%. Memory: {ctx_hint[:300] if ctx_hint else 'no history'}. "
+                    f"Template answer (ground truth, use its numbers exactly): {template[:400]} "
+                    f"Rewrite as warm partner in pure {lang}, ≤2 sentences, keep every number from template, add one memory insight if available. Never invent qty."
+                )
+                raw = llm_mod._call(
+                    [{"role":"system","content":f"You are Lakshmi's partner. Reply only in {lang}."},
+                     {"role":"user","content":prompt}],
+                    model=llm_mod.FAST_MODEL, max_tokens=320, temperature=0.3, timeout=5
+                )
+                if raw and len(raw.strip())>20:
+                    # grounding gate: must keep template numbers
+                    nums = re.findall(r"\d+", template)
+                    if all(n in raw for n in nums[:3]):  # at least first 3 numbers present
+                        brain_answer = raw.strip()[:650]
+            except Exception:
+                pass
+        answer = brain_answer or template
+        # still append memory if brain didn't use it and we have ctx
+        if not brain_answer and ctx:
+            answer = f"{answer}\n\n(குறிப்பு: {ctx[:200]})" if lang == "ta" else f"{answer}\n\n(Note from memory: {ctx[:200]})"
         optsA = _choice_options("answered", lang)
         send = _copilot_send(phone_digits, answer + _tap_suffix(optsA, channel), force_mock=force_mock,
                              voice_mode=vmode)
         return {"status": "answered", "question": qkind, "reply": answer,
                 "options": _choice_options("answered", lang),
-                "send": send, "language": lang, "engine": "live-data",
+                "send": send, "language": lang, "engine": "brain" if brain_answer else "live-data",
                 "cognee_context": ctx[:200] if ctx else None,
                 "phone": phone_digits, "transcript": transcript, "channel": channel}
 
