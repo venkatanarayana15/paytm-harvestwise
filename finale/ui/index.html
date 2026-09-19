@@ -922,8 +922,7 @@ micBtn.addEventListener("click",async()=>{
       s.getTracks().forEach(t=>t.stop());
       const blob=new Blob(chunks,{type:rec.mimeType||"audio/webm"});
       if(!blob.size){log("voice","empty recording");return;}
-      bubbleUser("🎤 voice note ("+Math.round(blob.size/1024)+" KB)",true);
-      log("voice","STT… ("+LANG+")");
+      log("voice","STT… ("+LANG+") "+Math.round(blob.size/1024)+"KB");
       try{
         const fd=new FormData();fd.append("file",blob,"audio.webm");
         const r=await fetch(API+"/stt?language_code="+encodeURIComponent(LANG),{method:"POST",body:fd});

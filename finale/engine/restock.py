@@ -321,10 +321,10 @@ def calculate_quantity(merchant_id: str, product: str, requested_qty: int | None
     stock = get_stock(merchant_id, product)
 
     if requested_qty and requested_qty > 0:
-        base = requested_qty
-    else:
-        shortfall = data["velocity"] * data["decay_days"] - stock
-        base = max(1, math.ceil(shortfall * SAFETY_MARGIN))
+        # Explicit merchant request — respect it exactly (no rain cut), accurate to request
+        return min(requested_qty, MAX_ORDER.get(product, 50))
+    shortfall = data["velocity"] * data["decay_days"] - stock
+    base = max(1, math.ceil(shortfall * SAFETY_MARGIN))
 
     rain = get_weather()["rain_prob"]
     modifier = data["rain_modifier"] if rain >= RAINY_THRESHOLD else 1.0
