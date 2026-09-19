@@ -2378,7 +2378,21 @@ async def cognee_recall(payload: dict):
     q = payload.get("query", "Why 20 kg tomato?")
     result = await asyncio.to_thread(cognee_client.recall, q)
     if "error" in result:
-        return {**result, "memory": get_memory(), "source": "local-fallback"}
+        # Local memory.json already has huge_facts (42 facts)
+        local_mem = get_memory().get("lakshmi", {})
+        facts = local_mem.get("huge_facts", [])
+        return {
+            "source": "local-fallback",
+            "query": q,
+            "results": [
+                {"kind": "fact", "text": f} 
+                for f in facts[:10]
+            ],
+            "memory_summary": {
+                "fact_count": local_mem.get("fact_count", 0),
+                "updated": local_mem.get("updated", ""),
+            },
+        }
     return result
 
 

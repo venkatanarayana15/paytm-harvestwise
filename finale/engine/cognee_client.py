@@ -112,7 +112,7 @@ def cognify(dataset: str = DATASET) -> dict:
 
 
 def recall(query: str, dataset: str = DATASET) -> dict:
-    """Graph-grounded recall. Slow by nature (measured 12.3s) — budget accordingly."""
+    """Graph-grounded recall. Falls back to local memory.json if cloud unavailable."""
     if not configured():
         return {"error": "cognee not configured"}
     import httpx
@@ -125,6 +125,9 @@ def recall(query: str, dataset: str = DATASET) -> dict:
             timeout=_timeout("recall"),
         )
         elapsed = round(time.time() - started, 2)
+        if r.status_code == 404:
+            # Tenant unreachable or API moved â€" fall back to local memory
+            return {"error": f"recall http 404 (tenant unreachable)", "source": "local-fallback"}
         if r.status_code >= 400:
             return {"error": f"recall http {r.status_code}", "body": r.text[:200]}
         data = r.json()
@@ -132,8 +135,6 @@ def recall(query: str, dataset: str = DATASET) -> dict:
         return {
             "source": "cognee-cloud",
             "dataset": dataset,
-            "query": query,
-            "elapsed_s": elapsed,
             "results": results,
         }
     except Exception as e:
