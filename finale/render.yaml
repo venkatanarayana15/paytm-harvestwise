@@ -3,8 +3,8 @@ services:
     name: harvestwise-api
     runtime: python
     rootDir: finale
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt || pip install -r finale/requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT || uvicorn finale.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
