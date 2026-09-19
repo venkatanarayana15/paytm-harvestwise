@@ -1955,6 +1955,26 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
                 return {"status":"cart_updated","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
 
     rules = _rules_intent(transcript)
+    # ── Fix: "update as 10kg" / "10kg" after dispatch has qty but no product → infer last product
+    if (not rules.get("products") or not rules["products"]):
+        # extract any lone qty
+        m_qty = re.search(r"\b(\d{1,3})\s*(kg|kgs?|kilo|bunch|bunches)?\b", low)
+        if m_qty and any(w in low for w in ["update","change","make it","correction","correct","as "]):
+            try:
+                qty = int(m_qty.group(1))
+                # infer product: pending first, else last dispatched
+                infer = None
+                pend_tmp = _get_pending(phone_digits)
+                if pend_tmp and pend_tmp.get("products"):
+                    infer = list(pend_tmp["products"].keys())[0]
+                else:
+                    hist = order_history(MERCHANT, 1)
+                    if hist: infer = hist[0].get("product")
+                if infer and 1 <= qty <= 90:
+                    rules["products"] = {infer: qty}
+                    rules["intent"] = "create_restock_order"
+            except Exception:
+                pass
     if rules["intent"] == "decline":
         pending_orders.pop(phone_digits, None)
         reply = _cancel_text(lang)
