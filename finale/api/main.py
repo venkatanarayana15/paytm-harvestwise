@@ -1906,16 +1906,28 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         return {"status":"morning_briefing","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
 
     # ── Inventory CRUD via copilot — must be before qkind (price/stock would hijack)
-    if any(k in low for k in ["add product","add inventory","create product"]):
-        m_prod = re.search(r"add (?:product|inventory)\s+([a-z]+)", low)
-        prod = m_prod.group(1).lower() if m_prod else _catalog_product_in(low) or "mango"
+    # flexible: "add potato on inventory" / "need to add potato in inventory" / "add product potato"
+    if ("add" in low and "inventory" in low) or any(k in low for k in ["add product","add inventory","create product"]):
+        # extract product: try "add X on/in inventory" then "add product X" then catalog hit then word after add
+        prod = None
+        m1 = re.search(r"add\s+([a-z]+)\s+(?:on|in|to)\s+inventory", low)
+        if m1: prod = m1.group(1).lower()
+        else:
+            m2 = re.search(r"add (?:product|inventory)\s+([a-z]+)", low)
+            if m2: prod = m2.group(1).lower()
+            else:
+                prod = _catalog_product_in(low)
+                if not prod:
+                    m3 = re.search(r"add\s+([a-z]{3,})", low)
+                    if m3 and m3.group(1) not in ["product","inventory","stock"]: prod = m3.group(1).lower()
+        prod = (prod or "potato").lower()
         m_qty = re.search(r"(\d+)\s*(kg|bunch|bunches)?", low)
         qty = int(m_qty.group(1)) if m_qty else 0
         m_price = re.search(r"price\s*(\d+)", low)
         price = int(m_price.group(1)) if m_price else 20
         unit = "bunch" if "bunch" in low else "kg"
         add_product(MERCHANT, prod, price=price, unit=unit, stock=qty)
-        reply = {"ta":f"{prod} added — {qty} {unit} @ Rs.{price}","en":f"{prod} added — {qty} {unit} @ Rs.{price}, inventory updated."}.get(lang,f"{prod} added.")
+        reply = {"ta":f"{prod} added — {qty} {unit} @ Rs.{price} — inventory updated. Stock: {stock_snapshot(MERCHANT).get(prod, qty)} {unit}","en":f"{prod} added — {qty} {unit} @ Rs.{price} — inventory updated. Stock: {stock_snapshot(MERCHANT).get(prod, qty)} {unit}"}.get(lang,f"{prod} added — {qty} {unit} @ Rs.{price}")
         opts=_choice_options("greeted",lang)
         send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
         return {"status":"inventory_added","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
