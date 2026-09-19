@@ -394,6 +394,10 @@ async def speech_to_text(file: UploadFile = File(...), language_code: str = "ta-
     except concurrent.futures.TimeoutError:
         raise HTTPException(504, "STT timed out — use typed transcript (labeled fallback)")
     except Exception as e:
+        # Graceful fallback for quota exhaustion — browser Web Speech API will handle it
+        msg = str(e)
+        if "402" in msg or "insufficient_quota" in msg or "No credits" in msg:
+            return {"transcript": "", "language_code": language_code, "fallback": "browser", "error": "sarvam_quota_exhausted", "detail": msg[:300]}
         raise HTTPException(502, f"STT failed: {e}")
 
 
@@ -2236,10 +2240,13 @@ def tts(payload: dict):
         audio = _SDK_EXECUTOR.submit(_do_tts).result(timeout=40)
         return Response(content=audio, media_type="audio/wav")
     except concurrent.futures.TimeoutError:
-        raise HTTPException(504, "TTS timed out — cached audio fallback is the labeled path")
+        raise HTTPException(504, "TTS timed out — browser fallback is the labeled path")
     except HTTPException:
         raise
     except Exception as e:
+        msg = str(e)
+        if "402" in msg or "insufficient_quota" in msg or "No credits" in msg:
+            raise HTTPException(503, f"TTS quota exhausted — browser speechSynthesis fallback: {msg[:200]}")
         raise HTTPException(502, f"TTS failed: {e}")
 
 
@@ -2295,6 +2302,13 @@ def demo_reset():
     pending_orders.clear()
     issued_tokens.clear()
     _save_dispatched()
+    # FIX 2026-09-19: also reset the onboarding profile so judges can replay
+    # the first-time flow on every reset.
+    profiles = _load_profiles()
+    if "917010919624" in profiles:
+        profiles["917010919624"]["onboarding_complete"] = False
+        profiles["917010919624"]["step"] = 0
+        _save_profiles(profiles)
     return {"status": "reset", "stock": state["stock"],
             "tokens_cleared": tokens_cleared, "pending_orders_cleared": pending_cleared}
 

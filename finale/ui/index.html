@@ -901,6 +901,17 @@ let rec,chunks=[];
 const micBtn=$("mic"),wave=$("wave");
 micBtn.addEventListener("click",async()=>{
   if(micBtn.classList.contains("rec")){try{rec.stop()}catch(e){}return;}
+  // Browser STT fallback when Sarvam quota exhausted
+  if(localStorage.getItem("useBrowserSTT")==="1" && (window.SpeechRecognition||window.webkitSpeechRecognition)){
+    const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec2=new Rec(); rec2.lang=LANG; rec2.interimResults=false; rec2.maxAlternatives=1;
+    micBtn.classList.add("rec");wave.classList.add("on");micBtn.innerHTML='<i class="fa-solid fa-stop"></i>';log("voice","browser STT listening… ("+LANG+")");
+    rec2.onresult=e=>{ const tr=e.results[0][0].transcript; log("voice",'browser transcript "'+tr+'"'); bubbleUser("🎤 "+tr,true); copilotTurn(tr,true); };
+    rec2.onerror=e=>{ log("voice","browser STT error: "+e.error); bubbleBot("Browser voice failed ("+e.error+") — tap a chip.",[],{engine:"stt"}); };
+    rec2.onend=()=>{ micBtn.classList.remove("rec");wave.classList.remove("on");micBtn.innerHTML='<i class="fa-solid fa-microphone"></i>'; };
+    try{ rec2.start(); }catch(e){ log("voice","browser STT failed: "+e.message); localStorage.removeItem("useBrowserSTT"); }
+    return;
+  }
   try{
     const s=await navigator.mediaDevices.getUserMedia({audio:true});
     rec=new MediaRecorder(s,{mimeType:MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":"audio/wav"});
@@ -915,13 +926,29 @@ micBtn.addEventListener("click",async()=>{
       log("voice","STT… ("+LANG+")");
       try{
         const fd=new FormData();fd.append("file",blob,"audio.webm");
-        const j=await fetch(API+"/stt?language_code="+encodeURIComponent(LANG),{method:"POST",body:fd}).then(r=>{
-          if(!r.ok)throw new Error(r.status+" on /stt");return r.json()});
+        const r=await fetch(API+"/stt?language_code="+encodeURIComponent(LANG),{method:"POST",body:fd});
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok){
+          const msg=(j.detail||r.status+" on /stt");
+          if(String(msg).includes("quota")||String(msg).includes("503")||r.status===503){
+            log("voice","Sarvam quota exhausted — using browser STT next time");
+            bubbleBot("⚠️ Sarvam voice quota exhausted. Your browser will handle voice next time — please type for now or tap a chip.",[],{engine:"stt"});
+            localStorage.setItem("useBrowserSTT","1");
+            return;
+          }
+          throw new Error(msg);
+        }
+        if(j.fallback==="browser"&&!j.transcript){
+          log("voice","Sarvam quota — fallback to browser");
+          bubbleBot("⚠️ Sarvam quota exhausted — please type or tap a chip. Next voice will use browser.",[],{engine:"stt"});
+          localStorage.setItem("useBrowserSTT","1");
+          return;
+        }
         const tr=(j.transcript||"").trim();
         log("sarvam",'transcript "'+tr.slice(0,60)+'"');
         if(!tr){bubbleBot("I could not hear that clearly — please try again or type.",[],{engine:"stt"});return;}
         copilotTurn(tr,true);
-      }catch(e){log("voice","STT failed: "+e.message);bubbleBot("Voice failed ("+e.message+") — you can type instead.",[],{engine:"stt"});}
+      }catch(e){log("voice","STT failed: "+e.message);bubbleBot("Voice failed ("+e.message+") — you can type instead or tap a chip.",[],{engine:"stt"});}
     };
     rec.start();micBtn.classList.add("rec");wave.classList.add("on");
     micBtn.innerHTML='<i class="fa-solid fa-stop"></i>';
