@@ -1961,6 +1961,23 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
             }
             return morning.get(lang, morning["en"])
 
+        # ── STOCK / INVENTORY QUERY ──
+        if any(w in low for w in ["stock", "inventory", "check stock", "show stock"]):
+            # Format alerts like the deterministic engine
+            lines = []
+            for p in sorted(snap.keys()):
+                d = CATALOG[MERCHANT].get(p, {})
+                unit = d.get("unit", "kg")
+                qty = snap[p]
+                exp = " ⏳ 1-day expiry" if d.get("decay_days", 0) <= 1 else ""
+                low_alert = " ⚠️ low!" if qty <= 3 else ""
+                lines.append(f"{p}: {qty} {unit}{exp}{low_alert}")
+            resp = {
+                "ta": f"வளவ் சரக்கு:\n{chr(10).join(lines)}",
+                "en": f"Full stock:\n{chr(10).join(lines)}",
+            }
+            return resp.get(lang, resp["en"])
+
         # ── INVENTORY / CRUD ACTIONS ──
         prod = _extract_prod(transcript)
         qty = _extract_qty(transcript)
