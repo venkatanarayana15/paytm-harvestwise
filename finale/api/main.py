@@ -382,11 +382,20 @@ async def speech_to_text(file: UploadFile = File(...), language_code: str = "ta-
             client = SarvamAI(api_subscription_key=api_key)
             suffix = (file.filename or "audio.wav").rsplit(".", 1)[-1].lower()
             codec = {"wav": "wav", "webm": "webm", "mp3": "mp3", "m4a": "mp4", "ogg": "ogg"}.get(suffix, "wav")
-            resp = client.speech_to_text.transcribe(
-                file=(f"audio.{suffix}", audio), model="saaras:v3",
-                language_code=language_code, input_audio_codec=codec,
-            )
-            return {"transcript": getattr(resp, "transcript", "") or str(resp), "language_code": language_code}
+            last_err = None
+            for model in ("saaras:v4", "saaras:v3"):
+                try:
+                    resp = client.speech_to_text.transcribe(
+                        file=(f"audio.{suffix}", audio), model=model,
+                        language_code=language_code, input_audio_codec=codec,
+                    )
+                    return {"transcript": getattr(resp, "transcript", "") or str(resp), "language_code": language_code, "model": model}
+                except Exception as e:
+                    last_err = e
+                    if "insufficient_quota" in str(e) or "402" in str(e):
+                        raise
+                    continue
+            raise last_err or RuntimeError("saaras v4/v3 failed")
         # FIX 2026-09-19: the SDK call used to run directly in the route threadpool
         # with no outer bound — a hung provider call parked a worker forever and
         # enough of those froze the whole API. Bounded executor + hard deadline.
@@ -1132,15 +1141,20 @@ def _stt_media(url: str, headers: dict | None = None, content_type: str = "") ->
         def _do_wa_stt() -> str:
             from sarvamai import SarvamAI
             client = SarvamAI(api_subscription_key=api_key)
-            for lang_code in ("unknown", "ta-IN"):
-                try:
-                    resp = client.speech_to_text.transcribe(
-                        file=(f"voice.{codec}", audio), model="saaras:v3",
-                        language_code=lang_code, input_audio_codec=codec,
-                    )
-                    return (getattr(resp, "transcript", "") or "").strip()
-                except Exception:
-                    continue
+            for model in ("saaras:v4", "saaras:v3"):
+                for lang_code in ("unknown", "ta-IN"):
+                    try:
+                        resp = client.speech_to_text.transcribe(
+                            file=(f"voice.{codec}", audio), model=model,
+                            language_code=lang_code, input_audio_codec=codec,
+                        )
+                        txt = (getattr(resp, "transcript", "") or "").strip()
+                        if txt:
+                            return txt
+                    except Exception as e:
+                        if "insufficient_quota" in str(e) or "402" in str(e):
+                            return ""
+                        continue
             return ""
         fut = _SDK_EXECUTOR.submit(_do_wa_stt, 45)
         return fut.result(timeout=45)
