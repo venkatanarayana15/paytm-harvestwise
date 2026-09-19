@@ -1931,6 +1931,28 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         opts=_choice_options("greeted",lang)
         send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
         return {"status":"inventory_added","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
+    # new vegetable without "inventory" keyword: "add brinjal 5kg" / "add new vegetable brinjal 5kg"
+    if "add" in low and ("new vegetable" in low or "new veg" in low or re.search(r"add\s+[a-z]{3,}\s+\d+\s*(kg|bunch)", low)):
+        m_new = re.search(r"add(?: new vegetable)?\s+([a-z]+)\s+\d+", low)
+        if not m_new: m_new = re.search(r"add\s+([a-z]{3,})", low)
+        if m_new:
+            cand = m_new.group(1).lower()
+            if cand not in ["product","inventory","stock","new","vegetable","veg"]:
+                m_qty = re.search(r"(\d+)\s*(kg|bunch|bunches)?", low)
+                qty = int(m_qty.group(1)) if m_qty else 0
+                m_price = re.search(r"price\s*(\d+)", low)
+                price = int(m_price.group(1)) if m_price else 20
+                unit = "bunch" if "bunch" in low else "kg"
+                if cand in CATALOG.get(MERCHANT, {}):
+                    # existing: add stock
+                    res = add_stock(MERCHANT, cand, qty)
+                    reply = {"ta":f"{cand} +{qty} → {res['after']} {unit} updated.","en":f"{cand} +{qty} → {res['after']} {unit} — stock updated."}.get(lang,f"{cand} stock {res['after']}")
+                else:
+                    add_product(MERCHANT, cand, price=price, unit=unit, stock=qty)
+                    reply = {"ta":f"{cand} added — {qty} {unit} @ Rs.{price} — new vegetable added! Stock: {qty} {unit}","en":f"{cand} added — {qty} {unit} @ Rs.{price} — new vegetable added! Stock: {qty} {unit}"}.get(lang,f"{cand} added — {qty} {unit}")
+                opts=_choice_options("greeted",lang)
+                send=_copilot_send(phone_digits, reply+_tap_suffix(opts,channel), force_mock=force_mock, voice_mode=vmode)
+                return {"status":"inventory_added","reply":reply,"options":opts,"send":send,"phone":phone_digits,"transcript":transcript,"channel":channel}
     if any(k in low for k in ["set stock","update stock","set inventory"]):
         prod=_catalog_product_in(low)
         m_qty=re.search(r"(\d+)\s*(kg|bunch)?", low)
