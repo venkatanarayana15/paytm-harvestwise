@@ -179,8 +179,8 @@ footer{max-width:1180px;margin:6px auto 24px;padding:0 18px;font-size:11.5px;col
       <button class="btn btn-ghost btn-sm" onclick="copilotApprove()">சரி approve</button>
       <button class="btn btn-ghost btn-sm" onclick="copilotReset()">Clear</button>
     </div>
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-      <span class="chip" id="copilotPhone">merchant: 917010919624 (allowlisted)</span>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span class="chip">merchant:</span><input class="txt" id="copilotPhoneInput" value="917010919624" style="width:150px;font-size:12px;padding:6px 10px" title="Allowlisted merchant phone (comma-separated in COPILOT_ALLOWED_PHONES)">
       <span class="chip llm" id="copilotEngine">engine: deterministic</span>
       <span class="chip" id="copilotTransport">WA-AKG → Twilio → mock</span>
     </div>
@@ -630,6 +630,7 @@ async function doRecall(){
 
 // ── Copilot Chat (mirrors WhatsApp brain — same /copilot/simulate) ──
 const COPILOT_PHONE = '917010919624';
+function copilotPhone(){ const el=document.getElementById('copilotPhoneInput'); const v=(el && el.value || COPILOT_PHONE).replace(/\D/g,''); return v || COPILOT_PHONE; }
 function copilotAddBubble(role, text, meta){
   const box = document.getElementById('copilotChatBox');
   const b = document.createElement('div'); b.className = 'bubble ' + role;
@@ -648,7 +649,8 @@ async function copilotSend(){
   copilotAddBubble('user', text, 'you · ' + sttLang());
   log('Copilot send: ' + text);
   try{
-    const r = await fetch(API + '/copilot/simulate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: COPILOT_PHONE, text }) });
+    const phone = copilotPhone();
+  const r = await fetch(API + '/copilot/simulate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, text }) });
     const j = await r.json();
     let botText = '';
     let meta = j.engine + ' · ' + j.status;
@@ -712,8 +714,17 @@ async function copilotMic(){
 // Seed copilot chat with hint
 setTimeout(()=> copilotAddBubble('bot', 'Vanakkam Lakshmi! Try: "நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி" — I will reply exactly like WhatsApp, with engine quantities + Sarvam explanation.', 'HarvestWise copilot · deterministic engine · 78% rain → ₹546'), 600);
 
-check(); refreshState(); refreshWhatsapp(); loadSoundbox();
+async function refreshCopilotState(){
+  try{
+    const j = await (await fetch(API + '/copilot/state')).json();
+    const t = j.transports || {};
+    document.getElementById('copilotTransport').textContent = (t.wa_akg ? 'wa-akg ' : '') + (t.twilio_freeform ? 'twilio ' : '') + 'mock · pending:' + Object.keys(j.pending_orders||{}).length;
+  }catch(e){}
+}
+check(); refreshState(); refreshWhatsapp(); loadSoundbox(); refreshCopilotState();
 setInterval(refreshWhatsapp, 30000);
+setInterval(refreshState, 5000);
+setInterval(refreshCopilotState, 5000);
 </script>
 </body>
 </html>

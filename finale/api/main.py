@@ -108,8 +108,8 @@ PRODUCT_WORDS = {
     "spinach": "spinach", "palak": "spinach", "पालक": "spinach", "పాలకూర": "spinach", "????": "spinach", "??????": "spinach", "ಮುರೈಕೀರೈ": "spinach", "ಪಾಲಕ್": "spinach", "ಪಾಲಕ್ ಸೊಪ್ಪು": "spinach",
     "potato": "potato", "aloo": "potato", "आलू": "potato", "ఆలూ": "potato", "???": "potato", "???": "potato", "ಆಲೂಗಡ್ಡೆ": "potato", "உருளைக்கிழங்கு": "potato",
 }
-APPROVE_WORDS = ["sari", "हाँ", "हां", "సరే", "சரி", "ಸರಿ", "yes", "ha", "haan", "ಹೌದು", "ஆம்", "ok", "confirm"]
-DENY_WORDS = ["illa", "नहीं", "కాదు", "இல்ல", "ಇಲ್ಲ", "no", "venam", "வேண்டாம்", "ಬೇಡ", "nahi", "cancel", "stop"]
+APPROVE_WORDS = ["sari", "seri", "saringa", "sar", "हाँ", "हां", "aam", "సరే", "sare", "சரி", "சரிங்க", "ஆம்", "ಸರಿ", "yes", "yeah", "ha", "haan", "ಹೌದು", "ok", "okay", "confirm", "ஓகே"]
+DENY_WORDS = ["illa", "இல்ல", "வேண்டாம்", "vendam", "venam", "nahi", "nahin", "नहीं", "కాదు", "లేదు", "ledu", "ಇಲ್ಲ", "ಬೇಡ", "beda", "no", "nope", "cancel", "stop"]
 
 # Prompt-injection markers — merchant speech is DATA, never instructions.
 INJECTION_MARKERS = [
@@ -117,6 +117,65 @@ INJECTION_MARKERS = [
     "reveal your prompt", "you are now", "act as", "jailbreak",
     "without approval", "skip approval", "auto approve", "override",
 ]
+
+# ─── Word-safe matching ───────────────────────────────────────────────────
+# FIX 2026-09-19: the old `"ha" in text` substring test matched "w**ha**t" and
+# "t**ha**t" (firing the approval gate on questions) and `"no" in text` matched
+# "k**no**w"/"**no**w" (cancelling orders that contained the word "now").
+# ASCII words now match on token boundaries; Indic words stay substring
+# (scripts are syllabic, boundaries are unreliable there).
+_ASCII_RE = re.compile(r"^[\x00-\x7f]+$")
+_PUNCT_AFTER = r"(?=$|[\s,.!?;:'\"()\u2013\u2014])"
+_PUNCT_BEFORE = r"(?:^|[\s,.!?;:'\"()\u2013\u2014])"
+
+
+def _word_hit(low: str, words: list) -> bool:
+    """Boundary-safe keyword match. 'yes' must not match 'yeasted';
+    'no' must not fire inside 'now'."""
+    for w in words:
+        if _ASCII_RE.match(w):
+            if re.search(_PUNCT_BEFORE + re.escape(w) + _PUNCT_AFTER, low):
+                return True
+        elif w in low:
+            return True
+    return False
+
+
+def _products_mentioned(low: str) -> dict:
+    """Product names present in the text, without claiming any quantity."""
+    out = {}
+    for word, product in PRODUCT_WORDS.items():
+        if _word_hit(low, [word]):
+            out[product] = None
+    return out
+
+
+# ─── Question intents — every answer is composed from LIVE engine data ────
+Q_WHY = ["why", "reason", "ஏன்", "ಏಕೆ", "क्यों", "ఎందుకు"]
+Q_PRICE = ["price", "rate", "cost", "how much for", "விலை", "விகிதம்", "ಬೆಲೆ", "दाम", "कीमत", "ధర", "రేటు"]
+Q_STOCK = ["how much", "how many", "stock", "left", "remaining", "எவ்வளவு", "எத்தனை", "சரக்கு", "கையில்", "ಎಷ್ಟು", "ದಾಸ್ತಾನು", "कितना", "कितने", "स्टॉक", "ఎంత", "స్టాక్"]
+Q_WEATHER = ["rain", "weather", "மழை", "ಮಳೆ", "बारिश", "मौसम", "వర్ష", "వాతావరణం"]
+Q_ORDERS = ["last order", "my orders", "order history", "orders", "bill", "கடந்த ஆர்டர்", "ஆர்டர் வரலாறு", "பில்", "ಹಿಂದಿನ ಆರ್ಡರ್", "ಬಿಲ್", "पिछला आर्डर", "बिल", "గత ఆర్డర్", "బిల్లు"]
+Q_SALES = ["sold", "sales", "velocity", "விற்பனை", "ಮಾರಾಟ", "बिक्री", "అమ్మకం"]
+GREETING_WORDS = ["hi", "hello", "hey", "vanakkam", "வணக்கம்", "ನಮಸ್ಕಾರ", "namaste", "नमस्ते", "నమస్కారం", "ನಮಸ್ತೆ"]
+HELP_WORDS = ["help", "menu", "உதவி", "ಸಹಾಯ", "मदद", "సహాయం"]
+
+
+def _question_kind(low: str) -> str | None:
+    if _word_hit(low, Q_WHY):
+        return "why"
+    if _word_hit(low, Q_PRICE):
+        return "price"
+    if _word_hit(low, Q_STOCK):
+        return "stock"
+    if _word_hit(low, Q_WEATHER):
+        return "weather"
+    if _word_hit(low, Q_ORDERS):
+        return "orders"
+    if _word_hit(low, Q_SALES):
+        return "sales"
+    return None
+
 
 LANG_MAP = {
     "ta": "ta", "tamil": "ta", "ta-in": "ta",
@@ -127,11 +186,33 @@ LANG_MAP = {
 }
 
 
+def _detect_lang(text: str) -> str:
+    # Telugu FIX 2026-09-19: \u0c00-\u0c7f was missing, so Telugu transcripts
+    # were treated as English and got Tamil asks.
+    if re.search(r"[\u0b80-\u0bff]", text):
+        return "ta"
+    if re.search(r"[\u0c80-\u0cff]", text):
+        return "kn"
+    if re.search(r"[\u0c00-\u0c7f]", text):
+        return "te"
+    if re.search(r"[\u0900-\u097f]", text):
+        return "hi"
+    return "en"
+
+
 def _parse_quantities(text: str) -> dict[str, int | None]:
     """Extract {product: requested_qty} from a transcript.
     Handles '20 கிலோ தக்காளி' / '20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ', '3 crates tomato', '10 கொத்து கொத்தமல்லி',
     Tamil/Kannada word-numbers, punctuation, and qty-before/after product order.
-    NEVER invents a number — absent numbers stay None (engine fills deterministically)."""
+    NEVER invents a number — absent numbers stay None (engine fills deterministically).
+
+    FIX 2026-09-19: glued tokens like '20kg' / '10bunches' were single \w+ matches,
+    so 'tomato 20kg' carried NO quantity. Numbers and unit words are now split
+    apart before parsing."""
+    # Split digits glued to unit words: '20kg' -> '20 kg', '10bunches' -> '10 bunches'
+    text = re.sub(r"(\d)(kgs?|kilos?|crates?|bunches?|bunch)\b", r"\1 \2", text, flags=re.IGNORECASE)
+    # Also split a Devanagari/Indic unit glued after digits: '20किलो' -> '20 किलो'
+    text = re.sub(r"(\d)([\u0b80-\u0bff\u0c80-\u0cff\u0c00-\u0c7f\u0900-\u097f]+)", r"\1 \2", text)
     tokens = re.findall(r"[\w\u0b80-\u0bff\u0c80-\u0cff\u0c00-\u0c7f\u0900-\u097f]+", text.lower())
     found: dict[str, int | None] = {}
     i = 0
@@ -162,24 +243,17 @@ def _parse_quantities(text: str) -> dict[str, int | None]:
     return found
 
 
-def _detect_lang(text: str) -> str:
-    if re.search(r"[\u0b80-\u0bff]", text):
-        return "ta"
-    if re.search(r"[\u0c80-\u0cff]", text):
-        return "kn"
-    if re.search(r"[\u0900-\u097f]", text):
-        return "hi"
-    return "en"
-
-
 def _rules_intent(text: str) -> dict:
     """Deterministic rule-based intent parse. Authoritative for all quantities."""
     low = text.lower()
+    tokens = set(re.findall(r"[\w\u0b80-\u0bff\u0c80-\u0cff\u0c00-\u0c7f\u0900-\u097f]+", low))
     if not text.strip():
         return {"intent": "silence", "products": {}, "clarification_needed": True}
-    if any(w in low for w in DENY_WORDS):
+    if any(w in tokens for w in DENY_WORDS):
         return {"intent": "decline", "products": {}, "clarification_needed": False}
-    if not any(w in low for w in APPROVE_WORDS + list(PRODUCT_WORDS)):
+    has_product = any(word in low for word in PRODUCT_WORDS)
+    has_approve = any(w in tokens for w in APPROVE_WORDS)
+    if not has_product and not has_approve:
         return {"intent": "out_of_scope", "products": {}, "clarification_needed": True,
                 "note": "no catalog product detected"}
 
@@ -642,14 +716,31 @@ def _stt_media(url: str, headers: dict | None = None, content_type: str = "") ->
         audio = r.content
         if not audio:
             return ""
-        codec = "ogg" if ("ogg" in content_type or "opus" in content_type) else "wav"
+        if "ogg" in content_type or "opus" in content_type:
+            codec = "ogg"
+        elif "mp4" in content_type or "m4a" in content_type:
+            codec = "mp4"
+        elif "webm" in content_type:
+            codec = "webm"
+        elif "mp3" in content_type:
+            codec = "mp3"
+        else:
+            codec = "wav"
         from sarvamai import SarvamAI
         client = SarvamAI(api_subscription_key=api_key)
-        resp = client.speech_to_text.transcribe(
-            file=(f"voice.{codec}", audio), model="saaras:v3",
-            language_code="ta-IN", input_audio_codec=codec,
-        )
-        return (getattr(resp, "transcript", "") or "").strip()
+        # FIX 2026-09-19: was hardcoded ta-IN — a Kannada/Hindi voice note came
+        # back garbled. saaras:v3 supports language_code="unknown" (auto-detect);
+        # if the provider rejects it, fall back to the crew default ta-IN.
+        for lang_code in ("unknown", "ta-IN"):
+            try:
+                resp = client.speech_to_text.transcribe(
+                    file=(f"voice.{codec}", audio), model="saaras:v3",
+                    language_code=lang_code, input_audio_codec=codec,
+                )
+                return (getattr(resp, "transcript", "") or "").strip()
+            except Exception:
+                continue
+        return ""
     except Exception:
         return ""
 
@@ -658,7 +749,11 @@ def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
     """Outbound copilot reply. Priority: WA-AKG -> Twilio freeform -> mock log.
     Every outcome is labelled so a judge can see exactly which transport ran."""
     phone_digits = _normalize_phone(phone)
+    attempts: list[dict] = []
     if not force_mock:
+        # FIX 2026-09-19: the old code RETURNED on WA-AKG failure, so a gateway
+        # hiccup silently ate the merchant's reply. Now every live transport is
+        # tried in priority order and the reply is never lost.
         wa_url = os.getenv("WA_AKG_URL")
         wa_key = os.getenv("WA_AKG_API_KEY")
         wa_session = os.getenv("WA_AKG_SESSION")
@@ -669,10 +764,11 @@ def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
                     f"{wa_url.rstrip('/')}/api/messages/{wa_session}/{jid}/send",
                     json={"message": {"text": text}},
                     headers={"X-API-Key": wa_key}, timeout=10)
-                return {"transport": "wa-akg", "status": r.status_code,
-                        "jid": jid}
+                attempts.append({"transport": "wa-akg", "status": r.status_code, "jid": jid})
+                if 200 <= r.status_code < 300:
+                    return {**attempts[-1], "attempts": attempts}
             except Exception as e:
-                return {"transport": "wa-akg", "error": type(e).__name__}
+                attempts.append({"transport": "wa-akg", "error": type(e).__name__})
         tw_sid, tw_tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
         if tw_sid and tw_tok:
             try:
@@ -683,9 +779,11 @@ def _copilot_send(phone: str, text: str, force_mock: bool = False) -> dict:
                           "From": os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
                           "Body": text},
                     headers={"Authorization": f"Basic {auth}"}, timeout=10)
-                return {"transport": "twilio-freeform", "status": r.status_code}
+                attempts.append({"transport": "twilio-freeform", "status": r.status_code})
+                if 200 <= r.status_code < 300:
+                    return {**attempts[-1], "attempts": attempts}
             except Exception as e:
-                return {"transport": "twilio-freeform", "error": type(e).__name__}
+                attempts.append({"transport": "twilio-freeform", "error": type(e).__name__})
     try:
         os.makedirs(os.path.join(BASE_DIR, "data"), exist_ok=True)
         with open(os.path.join(BASE_DIR, "data", "copilot_chat.log"), "a",
@@ -720,21 +818,176 @@ def _approve_and_dispatch(phone_digits: str, pend: dict) -> list[dict]:
     return results
 
 
-def _confirm_text(results: list[dict]) -> str:
-    """The kill-shot bubble: order + total + stock movement, all from the ledger."""
-    lines, moves, total = ["HarvestWise ✅ Order dispatched"], [], 0
+def _confirm_text(results: list[dict], lang: str = "ta") -> str:
+    """The kill-shot bubble: order + total + stock movement, all from the ledger,
+    in the merchant's language (numbers and '12->32' stay machine-readable)."""
+    heads = {
+        "ta": "HarvestWise ✅ ஆர்டர் அனுப்பப்பட்டது",
+        "kn": "HarvestWise ✅ ಆರ್ಡರ್ ಕಳುಹಿಸಲಾಗಿದೆ",
+        "hi": "HarvestWise ✅ ऑर्डर भेज दिया गया",
+        "te": "HarvestWise ✅ ఆర్డర్ పంపబడింది",
+        "en": "HarvestWise ✅ Order dispatched",
+    }
+    nones = {
+        "ta": "HarvestWise: ஒப்புதல் பதிவானது, ஆனால் எதுவும் அனுப்பப்படவில்லை.",
+        "kn": "HarvestWise: ಒಪ್ಪಿಗೆ ದಾಖಲಾಗಿದೆ, ಆದರೆ ಏನೂ ಕಳುಹಿಸಲಾಗಲಿಲ್ಲ.",
+        "hi": "HarvestWise: अनुमोदन दर्ज हुआ, पर कुछ भेजा नहीं गया।",
+        "te": "HarvestWise: ఆమోదం నమోదైంది, కానీ ఏమీ పంపబడలేదు.",
+        "en": "HarvestWise: approval recorded but nothing dispatched (see engine response).",
+    }
+    totals = {"ta": "மொத்தம் ரூ.", "kn": "ಒಟ್ಟು ರೂ.", "hi": "कुल रु.", "te": "మొత్తం రూ.", "en": "Total Rs."}
+    stocks = {"ta": "சரக்கு: ", "kn": "ದಾಸ್ತಾನು: ", "hi": "स्टॉक: ", "te": "స్టాక్: ", "en": "Stock: "}
+    updated = {"ta": " (லெட்ஜர் + மெமரி புதுப்பிக்கப்பட்டது)", "kn": " (ಲೆಡ್ಜರ್ + ಮೆಮೊರಿ ಅಪ್ಡೇಟ್)",
+               "hi": " (लेजर + मेमोरी अपडेटेड)", "te": " (లెడ్జర్ + మెమరీ అప్‌డేట్)", "en": " (ledger + memory updated)"}
     dispatched = [r for r in results if r.get("status") == "dispatched"]
     if not dispatched:
-        return "HarvestWise: approval recorded but nothing dispatched (see engine response)."
+        return nones.get(lang, nones["en"])
+    lines, moves, total = [heads.get(lang, heads["en"])], [], 0
     for r in dispatched:
         rec = r.get("record", {})
-        lines.append(f"• {rec.get('quantity_kg')} {rec.get('unit')} "
-                     f"{rec.get('name_tn') or rec.get('product')} -> Rs.{rec.get('total_inr')}")
+        data = CATALOG.get(MERCHANT, {}).get(rec.get("product") or "", {})
+        name = _loc_name(data, rec.get("product") or "", lang)
+        lines.append(f"• {rec.get('quantity_kg')} {rec.get('unit')} {name} -> Rs.{rec.get('total_inr')}")
         moves.append(f"{rec.get('product')} {rec.get('stock_before')}->{rec.get('stock_after')}")
         total += rec.get("total_inr") or 0
-    lines.append(f"Total Rs.{total}")
-    lines.append("Stock: " + ", ".join(moves) + " (ledger + memory updated)")
+    lines.append(totals.get(lang, totals["en"]) + str(total))
+    lines.append(stocks.get(lang, stocks["en"]) + ", ".join(moves) + updated.get(lang, updated["en"]))
     return "\n".join(lines)
+
+
+LANG_NAMES = {"ta": "Tamil", "kn": "Kannada", "hi": "Hindi", "te": "Telugu", "en": "English"}
+PENDING_TTL_S = 30 * 60  # an unconfirmed basket dies after 30 min — stale approvals never dispatch
+
+
+def _catalog_product_in(low: str) -> str | None:
+    """First catalog product named in the text (word-safe)."""
+    for word, product in PRODUCT_WORDS.items():
+        if _word_hit(low, [word]):
+            return product
+    return None
+
+
+def _loc_name(data: dict, product: str, lang: str) -> str:
+    """Localized product name; falls back to Tamil then the catalog key."""
+    key = {"kn": "name_kn", "hi": "name_hi", "te": "name_te"}.get(lang)
+    return (data.get(key) if key else None) or data.get("name_tn") or product
+
+
+def _get_pending(phone_digits: str) -> dict | None:
+    """Pending basket with a TTL — expired ones are dropped silently."""
+    pend = pending_orders.get(phone_digits)
+    if not pend:
+        return None
+    if datetime.datetime.now().timestamp() - pend.get("created", 0) > PENDING_TTL_S:
+        pending_orders.pop(phone_digits, None)
+        return None
+    return pend
+
+
+def _help_text(lang: str) -> str:
+    return {
+        "ta": "HarvestWise உதவி:\n• ஆர்டர்: \"நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி\"\n• சரி = ஒப்புதல் · இல்ல/வேண்டாம் = ரத்து\n• கேளுங்கள்: விலை? எவ்வளவு சரக்கு? மழை? ஏன் 20? கடந்த ஆர்டர்?",
+        "kn": "HarvestWise ಸಹಾಯ:\n• ಆರ್ಡರ್: \"ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ\"\n• ಸರಿ = ಒಪ್ಪಿಗೆ · ಬೇಡ/ಇಲ್ಲ = ರದ್ದು\n• ಕೇಳಿ: ಬೆಲೆ? ಎಷ್ಟು ದಾಸ್ತಾನು? ಮಳೆ? ಏಕೆ 20? ಹಿಂದಿನ ಆರ್ಡರ್?",
+        "hi": "HarvestWise मदद:\n• ऑर्डर: \"कल 20 किलो टमाटर, 10 गुच्छा धनिया\"\n• हाँ = स्वीकृति · नहीं = रद्द\n• पूछें: दाम? कितना स्टॉक? बारिश? क्यों 20? पिछला ऑर्डर?",
+        "te": "HarvestWise సహాయం:\n• ఆర్డర్: \"రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు\"\n• సరే = ఆమోదం · కాదు/లేదు = రద్దు\n• అడగండి: ధర? ఎంత స్టాక్? వర్షం? ఎందుకు 20? గత ఆర్డర్?",
+        "en": "HarvestWise help:\n• Order: \"tomato 20kg, 10 bunches coriander\"\n• yes/ok = approve · no/cancel = cancel\n• Ask: price? stock? rain? why 20? last orders?",
+    }.get(lang) or _help_text("en") if False else {
+        "ta": "HarvestWise உதவி:\n• ஆர்டர்: \"நாளை 20 கிலோ தக்காளி, 10 கொத்து கொத்தமல்லி\"\n• சரி = ஒப்புதல் · இல்ல/வேண்டாம் = ரத்து\n• கேளுங்கள்: விலை? எவ்வளவு சரக்கு? மழை? ஏன் 20? கடந்த ஆர்டர்?",
+        "kn": "HarvestWise ಸಹಾಯ:\n• ಆರ್ಡರ್: \"ನಾಳೆ 20 ಕಿಲೋ ಟೊಮ್ಯಾಟೊ, 10 ಗೊಂಚಲು ಕೊತ್ತಂಬರಿ\"\n• ಸರಿ = ಒಪ್ಪಿಗೆ · ಬೇಡ/ಇಲ್ಲ = ರದ್ದು\n• ಕೇಳಿ: ಬೆಲೆ? ಎಷ್ಟು ದಾಸ್ತಾನು? ಮಳೆ? ಏಕೆ 20? ಹಿಂದಿನ ಆರ್ಡರ್?",
+        "hi": "HarvestWise मदद:\n• ऑर्डर: \"कल 20 किलो टमाटर, 10 गुच्छा धनिया\"\n• हाँ = स्वीकृति · नहीं = रद्द\n• पूछें: दाम? कितना स्टॉक? बारिश? क्यों 20? पिछला ऑर्डर?",
+        "te": "HarvestWise సహాయం:\n• ఆర్డర్: \"రేపు 20 కిలో టమాటా, 10 కట్ట ధనియాలు\"\n• సరే = ఆమోదం · కాదు/లేదు = రద్దు\n• అడగండి: ధర? ఎంత స్టాక్? వర్షం? ఎందుకు 20? గత ఆర్డర్?",
+        "en": "HarvestWise help:\n• Order: \"tomato 20kg, 10 bunches coriander\"\n• yes/ok = approve · no/cancel = cancel\n• Ask: price? stock? rain? why 20? last orders?",
+    }[lang]
+
+
+def _welcome_text(lang: str) -> str:
+    return {
+        "ta": "வணக்கம் லக்ஷ்மி! HarvestWise உங்கள் மறுசப்ளை உதவியாளர். ஆர்டர் சொல்லுங்கள் அல்லது 'உதவி' என்று கேளுங்கள்.",
+        "kn": "ನಮಸ್ಕಾರ ಲಕ್ಷ್ಮಿ! HarvestWise ನಿಮ್ಮ ಮರುಪೂರೈಕೆ ಸಹಾಯಕ. ಆರ್ಡರ್ ಹೇಳಿ ಅಥವಾ 'ಸಹಾಯ' ಎಂದು ಕೇಳಿ.",
+        "hi": "नमस्ते लक्ष्मी! HarvestWise आपका रीस्टॉक सहायक है। ऑर्डर बताइए या 'मदद' कहिए।",
+        "te": "నమస్కారం లక్ష్మీ! HarvestWise మీ రీస్టాక్ సహాయకుడు. ఆర్డర్ చెప్పండి లేదా 'సహాయం' అని అడగండి.",
+        "en": "Vanakkam Lakshmi! HarvestWise is your restocking copilot. Say an order, or ask for help.",
+    }[lang]
+
+
+def _qa_answer(kind: str, low: str, lang: str) -> str:
+    """Q&A composed LIVE from engine/catalog/ledger/weather — never scripted numbers."""
+    product = _catalog_product_in(low)
+    weather = get_weather()
+    rain = int(round(weather["rain_prob"] * 100))
+    if kind == "weather":
+        return {
+            "ta": f"நாளை மழை {rain} சதவீதம் (ஆதாரம்: {weather.get('source')}).",
+            "kn": f"ನಾಳೆ ಮಳೆ {rain} ಪ್ರತಿಶತ (ಮೂಲ: {weather.get('source')}).",
+            "hi": f"कल बारिश {rain} प्रतिशत (स्रोत: {weather.get('source')}).",
+            "te": f"రేపు వర్షం {rain} శాతం (మూలం: {weather.get('source')}).",
+            "en": f"Rain tomorrow: {rain}% (source: {weather.get('source')}).",
+        }[lang]
+    product = product or "tomato"
+    data = CATALOG[MERCHANT][product]
+    name = _loc_name(data, product, lang)
+    unit = data["unit"]
+    if kind == "price":
+        return {
+            "ta": f"{name} விலை ரூ.{data['price_per_unit']}/{unit} (மண்டி விலை, விதைக்கப்பட்ட டெமோ தரவு).",
+            "kn": f"{name} ಬೆಲೆ ರೂ.{data['price_per_unit']}/{unit} (ಮಾರುಕಟ್ಟೆ ದರ, ಬಿತ್ತಿದ ಡೆಮೊ ದತ್ತಾಂಶ).",
+            "hi": f"{name} कीमत रु.{data['price_per_unit']}/{unit} (मंडी भाव, सीडेड डेमो डेटा).",
+            "te": f"{name} ధర రూ.{data['price_per_unit']}/{unit} (మండీ ధర, సీడెడ్ డెమో డేటా).",
+            "en": f"{name}: Rs.{data['price_per_unit']}/{unit} (mandi rate, seeded demo data).",
+        }[lang]
+    if kind == "stock":
+        stock = get_stock(MERCHANT, product)
+        return {
+            "ta": f"{name}: இப்போது {stock} {unit} கையில் உள்ளது.",
+            "kn": f"{name}: ಈಗ {stock} {unit} ದಾಸ್ತಾನು ಇದೆ.",
+            "hi": f"{name}: अभी {stock} {unit} स्टॉक है।",
+            "te": f"{name}: ఇప్పుడు {stock} {unit} స్టాక్ ఉంది.",
+            "en": f"{name}: {stock} {unit} on hand right now.",
+        }[lang]
+    if kind == "sales":
+        return {
+            "ta": f"{name}: சராசரியாக நாளுக்கு {data['velocity']} {unit} விற்பனை (90 நாள்).",
+            "kn": f"{name}: ಸರಾಸರಿ ದಿನಕ್ಕೆ {data['velocity']} {unit} ಮಾರಾಟ (90 ದಿನ).",
+            "hi": f"{name}: औसतन {data['velocity']} {unit} प्रति दिन बिक्री (90 दिन)।",
+            "te": f"{name}: సగటున రోజుకు {data['velocity']} {unit} అమ్మకం (90 రోజులు).",
+            "en": f"{name}: {data['velocity']} {unit}/day average (90d).",
+        }[lang]
+    if kind == "orders":
+        hist = order_history(MERCHANT, 3)
+        if not hist:
+            return {
+                "ta": "இதுவரை ஆர்டர் இல்லை. ஆர்டர் சொல்லுங்கள்!",
+                "kn": "ಇನ್ನೂ ಆರ್ಡರ್ ಇಲ್ಲ. ಆರ್ಡರ್ ಹೇಳಿ!",
+                "hi": "अभी तक कोई ऑर्डर नहीं। ऑर्डर बताइए!",
+                "te": "ఇంకా ఆర్డర్ లేదు. ఆర్డర్ చెప్పండి!",
+                "en": "No orders yet. Say an order!",
+            }[lang]
+        head = {"ta": "கடந்த ஆர்டர்கள்:", "kn": "ಹಿಂದಿನ ಆರ್ಡರ್‌ಗಳು:", "hi": "पिछले ऑर्डर:",
+                "te": "గత ఆర్డర్‌లు:", "en": "Recent orders:"}[lang]
+        lines = [f"• {o['at'][:10]} {o['qty']} {o['unit']} {o.get('name_tn') or o['product']} Rs.{o.get('total_inr')}"
+                 for o in hist]
+        return head + "\n" + "\n".join(lines)
+    if kind == "why":
+        rec = recommendation(MERCHANT, product, None)
+        stock = rec["stock_on_hand"]
+        return {
+            "ta": (f"எஞ்சின் பரிந்துரை: {name} வேகமாக விற்கிறது (நாளுக்கு {data['velocity']} {unit}), "
+                   f"கையில் {stock} {unit} மட்டுமே, நாளை மழை {rain}% — அதனால் {rec['recommended_qty']} {unit} "
+                   f"(ரூ.{rec['total_inr']}). எண் எப்போதும் எஞ்சினிலிருந்தே."),
+            "kn": (f"ಎಂಜಿನ್ ಶಿಫಾರಸು: {name} ವೇಗವಾಗಿ ಮಾರಾಟವಾಗುತ್ತದೆ (ದಿನಕ್ಕೆ {data['velocity']} {unit}), "
+                   f"ದಾಸ್ತಾನು {stock} {unit} ಮಾತ್ರ, ನಾಳೆ ಮಳೆ {rain}% — ಆದ್ದರಿಂದ {rec['recommended_qty']} {unit} "
+                   f"(ರೂ.{rec['total_inr']}). ಸಂಖ್ಯೆ ಯಾವಾಗಲೂ ಎಂಜಿನ್‌ನಿಂದ."),
+            "hi": (f"इंजन की सिफारिश: {name} तेज़ बिकता है ({data['velocity']} {unit}/दिन), "
+                   f"स्टॉक सिर्फ {stock} {unit}, कल बारिश {rain}% — इसलिए {rec['recommended_qty']} {unit} "
+                   f"(रु.{rec['total_inr']}). संख्या हमेशा इंजन से।"),
+            "te": (f"ఇంజన్ సిఫార్సు: {name} వేగంగా అమ్ముడవుతుంది (రోజుకు {data['velocity']} {unit}), "
+                   f"స్టాక్ {stock} {unit} మాత్రమే, రేపు వర్షం {rain}% — అందుకే {rec['recommended_qty']} {unit} "
+                   f"(రూ.{rec['total_inr']}). సంఖ్య ఎప్పుడూ ఇంజన్ నుంచి."),
+            "en": (f"Engine: {name} sells {data['velocity']} {unit}/day, only {stock} {unit} on hand, "
+                   f"{rain}% rain tomorrow -> {rec['recommended_qty']} {unit} (Rs.{rec['total_inr']}). "
+                   f"Numbers always come from the engine."),
+        }[lang]
+    return _help_text(lang)
 
 
 def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
@@ -757,6 +1010,7 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         transcript = _stt_media(media_url, media_headers, content_type)
 
     low = transcript.lower()
+    tokens = set(re.findall(r"[\w\u0b80-\u0bff\u0c80-\u0cff\u0c00-\u0c7f\u0900-\u097f]+", low))
     if any(m in low for m in INJECTION_MARKERS):
         _copilot_send(phone_digits,
                       "HarvestWise: speech refused - embedded instructions were ignored.",
@@ -764,15 +1018,14 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         return {"status": "injection_blocked", "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
 
-    if any(w in low for w in DENY_WORDS):
+    if _word_hit(low, DENY_WORDS):
         pending_orders.pop(phone_digits, None)
         _copilot_send(phone_digits,
-                      "HarvestWise: order cancelled. Tell me what you need anytime.",
-                      force_mock=force_mock)
+                      _cancel_text(_detect_lang(transcript or "no")), force_mock=force_mock)
         return {"status": "declined", "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
 
-    if any(w in low for w in APPROVE_WORDS):
+    if _word_hit(low, APPROVE_WORDS):
         pend = pending_orders.pop(phone_digits, None)
         if not pend:
             _copilot_send(phone_digits,
@@ -789,6 +1042,50 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
                 "dispatched": [r for r in results if r.get("status") == "dispatched"],
                 "rejected": rejected, "confirm": confirm, "channel": channel}
 
+    # --- Best-response: Why / Stock / Memory (grounded, Sarvam + Cognee, never hardcoded) ---
+    low_why = low
+    if any(m in low_why for m in ["why", "etharku", "ethukku", "karanam", "kaaranam", "reason", "explain", "stock", "inventory", "memory", "recall", "enna", "edhukku", "vilakam"]):
+        # Try to answer about current recommendation or stock, grounded on engine + Cognee
+        prod_in_why = None
+        for w, p in PRODUCT_WORDS.items():
+            if w in low_why:
+                prod_in_why = p
+                break
+        if prod_in_why or any(w in low_why for w in ["stock", "inventory"]):
+            # Stock snapshot without product → return all stocks (deterministic, not hardcoded)
+            if any(w in low_why for w in ["stock", "inventory"]) and not prod_in_why:
+                snap = stock_snapshot(MERCHANT)
+                lines = [f"{p}: {qty} {CATALOG[MERCHANT][p]['unit']}" for p, qty in snap.items()]
+                answer = "Stock now — " + " · ".join(lines) + "."
+                _copilot_send(phone_digits, answer, force_mock=force_mock)
+                return {"status": "answered", "phone": phone_digits, "transcript": transcript, "answer": answer, "channel": channel, "engine": "stock_snapshot"}
+            try:
+                target = prod_in_why or "tomato"
+                rec = recommendation(MERCHANT, target, None)
+                weather = get_weather()
+                observations = [
+                    {"tool": "get_stock", "args": target, "result": f"{rec['stock_on_hand']} {rec['unit']}"},
+                    {"tool": "get_sales_velocity", "args": target, "result": f"{CATALOG[MERCHANT][target]['velocity']} {rec['unit']}/day"},
+                    {"tool": "get_weather", "args": "tomorrow", "result": f"{int(weather['rain_prob']*100)}% rain ({weather.get('source')})"},
+                    {"tool": "get_recommendation", "args": target, "result": f"{rec['recommended_qty']} {rec['unit']} = Rs.{rec['total_inr']}"},
+                ]
+                reason_out = llm_mod.reason(rec, observations, language="Tamil", profile="fast")
+                cog = cognee_client.recall(f"Why did HarvestWise recommend {rec['recommended_qty']} {rec['unit']} {target} for Lakshmi?", dataset="harvestwise") if cognee_client.configured() else {"error": "cognee not configured"}
+                reasoning = (reason_out or {}).get("reasoning") if reason_out else None
+                if not reasoning:
+                    reasoning = f"Engine: stock {rec['stock_on_hand']} {rec['unit']}, velocity {CATALOG[MERCHANT][target]['velocity']}/day, rain {int(weather['rain_prob']*100)}% -> {rec['recommended_qty']} {rec['unit']} (Rs.{rec['total_inr']})."
+                cog_text = ""
+                if cog.get("results"):
+                    cog_text = " · ".join([str(x.get("text") or x.get("content") or "")[:120] for x in cog["results"][:1] if x.get("text") or x.get("content")])
+                answer = reasoning
+                if cog_text:
+                    answer += f"\n\nMemory: {cog_text[:180]}"
+                answer += f"\n\nStock now: {rec['stock_on_hand']} {rec['unit']} on hand."
+                _copilot_send(phone_digits, answer, force_mock=force_mock)
+                return {"status": "answered", "phone": phone_digits, "transcript": transcript, "product": target, "answer": answer, "channel": channel, "engine": "reason+cognee"}
+            except Exception:
+                pass
+
     rules = _rules_intent(transcript)
     if rules["intent"] != "create_restock_order" or not rules.get("products"):
         _copilot_send(phone_digits,
@@ -803,7 +1100,14 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         items.append(rec)
         total += rec["total_inr"]
     weather = get_weather()
+    # Best response: Sarvam P3 explain with grounding gate, fallback to deterministic template (never hardcoded numbers)
     ask = llm_mod.template_ask(items, weather["rain_prob"])
+    try:
+        sarvam_ask = llm_mod.explain_ask(items, weather["rain_prob"], language="Tamil")
+        if sarvam_ask:
+            ask = sarvam_ask
+    except Exception:
+        pass
     suffix = ("\nசரி என்று பதில் சொல்லுங்கள் (reply சரி to confirm)."
               if _detect_lang(transcript) == "ta" else
               "\nReply சரி to confirm.")
