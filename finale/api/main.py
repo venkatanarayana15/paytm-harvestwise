@@ -1891,50 +1891,78 @@ def _handle_merchant_message(phone: str, text: str = "", media_url: str = "",
         return {"status": "declined", "phone": phone_digits,
                 "transcript": transcript, "channel": channel}
     if rules["intent"] != "create_restock_order" or not rules.get("products"):
-        # ── Enhanced fallback: try Sarvam LLM with cognee grounding, else helpful capability list
+        # ── Partner fallback: business-aware, proactive, not bot-like
         try:
+            # Build shop context for partner persona
+            stock = stock_snapshot(MERCHANT)
+            weather = get_weather()
+            rain = int(round(weather["rain_prob"]*100))
+            orders = order_history(MERCHANT, 3)
+            last = orders[0] if orders else None
+            # Query-filtered cognee snippet (not first 2)
             cognee_snippet = ""
             try:
                 with open(MEMORY_PATH, encoding="utf-8") as f:
                     mem = json.load(f).get(MERCHANT, {})
-                    facts = mem.get("huge_facts", [])[:2]
-                    if facts:
-                        cognee_snippet = " | ".join(facts)
+                    all_facts = mem.get("huge_facts", []) or mem.get("cause_chain", []) or []
+                    # filter by query words
+                    qwords = set(re.findall(r"\w+", transcript.lower()))
+                    filtered = [f for f in all_facts if any(w in f.lower() for w in qwords)] if qwords else []
+                    pick = (filtered[:2] if filtered else all_facts[:2])
+                    if pick:
+                        cognee_snippet = " | ".join(pick[:2])
             except OSError:
                 pass
-            # Try LLM for any-question handling (hybrid mode, 5s budget)
+            ctx_hint = ctx or cognee_snippet
+            shop_line = f"Shop: Lakshmi Kirana Basavanagudi, sells tomato/onion/coriander/spinach, stock tomato {stock.get('tomato')}kg, rain {rain}% tmrw"
+            if last:
+                shop_line += f", last order {last['qty']}{last['unit']} {last['product']} Rs.{last.get('total_inr')}"
             llm_reply = None
             if llm_mod.available() and transcript.strip():
-                ctx_hint = ctx or cognee_snippet
                 prompt = (
-                    f"You are HarvestWise, a vernacular restocking copilot for Lakshmi (Basavanagudi, sells tomato/onion/coriander/spinach). "
-                    f"User asked in {lang}: '{transcript}'. "
-                    f"Context: {ctx_hint[:400] if ctx_hint else 'no memory yet'}. "
-                    f"Answer helpfully in {lang} (pure language, no mix). Keep ≤2 sentences. "
-                    f"If you don't know, list what you CAN do: stock, price, why 20kg, weather, orders, growth. Never invent quantities."
+                    f"You are Lakshmi's AI business partner (not a bot) at Basavanagudi. {shop_line}. "
+                    f"Context from memory: {ctx_hint[:350] if ctx_hint else 'new merchant, no history'}. "
+                    f"User said in {lang}: '{transcript}'. "
+                    f"Reply as partner: warm, concise (≤2 sentences), pure {lang} (no mix), business-aware. "
+                    f"Relate generic questions to her shop (e.g. 'paytm?' → settlement/GMV/stock, 'joke' → warm steer to business). "
+                    f"End with ONE actionable tap: Check stock / Order 20kg / Show growth. Never invent quantities. Never say 'not found'."
                 )
                 raw = llm_mod._call(
-                    [{"role": "system", "content": "You are HarvestWise copilot. Answer concisely in the user's language."},
+                    [{"role": "system", "content": f"You are Lakshmi's business partner. Reply only in {lang}, warm and concise."},
                      {"role": "user", "content": prompt}],
-                    model=llm_mod.FAST_MODEL, max_tokens=300, temperature=0.3, timeout=5
+                    model=llm_mod.FAST_MODEL, max_tokens=320, temperature=0.35, timeout=5
                 )
-                if raw and len(raw.strip()) > 10:
-                    llm_reply = raw.strip()[:600]
+                if raw and len(raw.strip()) > 12:
+                    llm_reply = raw.strip()[:620]
             if llm_reply:
                 reply = llm_reply
+                # ensure one tap hint
+                if "Check stock" not in reply and "tap" not in reply.lower():
+                    reply += {"ta": "\nTap 1: பங்கு பார்க்க 2: ஆர்டர்", "hi": "\nTap 1: स्टॉक 2: ऑर्डर", "en": "\nTap 1: Check stock 2: Order 20kg"}.get(lang, "\nTap 1: Check stock")
             else:
-                # Deterministic helpful fallback with capabilities + memory
-                base = _fallback_text(lang)
+                # Partner deterministic: don't sound like bot
+                partner_base = {
+                    "ta": f"Vanakkam Lakshmi! Naan unga business partner. Innaiku tomato {stock.get('tomato')}kg irukku, naalaikku mazhai {rain}%.",
+                    "hi": f"Namaste Lakshmi! Aapki dukaan mein tomato {stock.get('tomato')}kg hai, kal baarish {rain}%.",
+                    "en": f"Hi Lakshmi — your partner here. Tomato {stock.get('tomato')}kg on hand, {rain}% rain tomorrow."
+                }.get(lang, f"Hi Lakshmi — tomato {stock.get('tomato')}kg, rain {rain}% tmrw.")
                 caps = {
-                    "ta": " நான் செய்யக்கூடியவை: பங்கு, விலை, ஏன் 20கிலோ, வானிலை, ஆர்டர்கள், வளர்ச்சி.",
-                    "hi": " मैं ये कर सकता हूँ: स्टॉक, कीमत, क्यों 20kg, मौसम, ऑर्डर, ग्रोथ।",
-                    "en": " I can help with: stock, price, why 20kg, weather, orders, growth."
-                }.get(lang, " I can help with: stock, price, why 20kg, weather, orders, growth.")
-                reply = base + caps
-                if ctx:
-                    reply += f"\n\n(Note: {ctx[:180]})"
-                elif cognee_snippet:
-                    reply += f"\n\n(Graph: {cognee_snippet[:180]})"
+                    "ta": " Naan help pannuven: stock, vilai, yen 20kg, vaanam, orders, valarchi.",
+                    "hi": " Main madad kar sakta hoon: stock, keemat, kyun 20kg, mausam, orders, growth.",
+                    "en": " I can help: stock, price, why 20kg, weather, orders, growth — what's next?"
+                }.get(lang, " I can help: stock, price, why 20kg, weather, orders, growth.")
+                # tailor to query
+                ql = transcript.lower()
+                if "paytm" in ql:
+                    tail = {"ta": " Paytm moolam customer pay pannuvanga — unga 7-day GMV paarkalaama?", "hi": " Paytm se customer pay karte hain — aapka GMV dekhein?", "en": " Paytm is how customers pay you — want to see your 7-day GMV?"}.get(lang, " Want to see GMV?")
+                    reply = partner_base + tail
+                elif "joke" in ql or "jok" in ql:
+                    tail = {"ta": " Joke illa, aana neenga mazhaiyil ₹240 save pannineenga — adha repeat pannalaama?", "hi": " Joke nahi, par aapne baarish mein ₹240 bachaye — repeat karein?", "en": " No joke, but you saved ₹240 last rainy day — want to do it again?"}.get(lang, " Want to repeat that win?")
+                    reply = partner_base + " " + tail
+                else:
+                    reply = partner_base + caps
+                if ctx_hint:
+                    reply += f"\n\n({ctx_hint[:160]})"
         except Exception:
             reply = _fallback_text(lang)
         opts = _choice_options("greeted", lang)
